@@ -1,0 +1,11 @@
+streamlit
+pandas
+bs4
+lxml
+streamlit-option-menu
+streamlit-aggrid
+click
+jsonlines
+sentence-transformers
+faiss-cpu
+numpy

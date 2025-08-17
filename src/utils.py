@@ -34,6 +34,11 @@ from st_aggrid import (
     , JsCode, DataReturnMode
 )
 
+# semantic search libs
+import numpy as np
+import faiss
+from sentence_transformers import SentenceTransformer
+
 from ui_layout import *
 
 
@@ -80,6 +85,10 @@ CFG = {
 
     "NOTE_TYPE": [BLANK_STR_VALUE, 'learning', 'research', 'project', 'journal'],
     "STATUS_CODE": [BLANK_STR_VALUE, "ToDo","WIP", "Blocked", "Complete", "De-Scoped", "Others"],
+
+    # semantic search config
+    "EMBEDDING_MODEL": "all-MiniLM-L6-v2",
+    "FAISS_INDEX_PATH": "./db/notes_faiss.index",
 
 }
 
@@ -918,14 +927,18 @@ def ui_layout_form(selected_row, table_name):
         if save_btn:
             try:
                 delete_flag = data.get("delelte_record", False)
+                data_changed = False
+                
                 if delete_flag:
                     if data.get("id"):
                         db_delete_by_id(data)
+                        data_changed = True
                 else:
                     if data.get("id"):
                         data.update({"updated_at": get_ts_now(),
                                     })
                         db_update_by_id(data)
+                        data_changed = True
                     else:
                         data.update({
                                     "updated_at": get_ts_now(),
@@ -934,6 +947,16 @@ def ui_layout_form(selected_row, table_name):
                                     "created_by": DEFAULT_USER,
                                     })
                         db_upsert(data)
+                        data_changed = True
+                
+                # Refresh FAISS index after any data change
+                if data_changed:
+                    try:
+                        build_faiss_index()
+                        st.success("Note saved and search index updated!")
+                    except Exception as idx_ex:
+                        st.warning(f"Note saved but search index update failed: {idx_ex}")
+                        logging.error(f"FAISS index refresh failed: {idx_ex}")
 
             except Exception as ex:
                 st.error(f"{str(ex)}")
@@ -1184,4 +1207,129 @@ def prepend_chat_history(chat_history, question):
             contents.append("\n Assistant: " + i.get("content", "") + " \n")
 
     return "\n".join(contents) + f"\n User: {question} \n\n Assistant: \n"
+
+#############################
+#  Semantic Search Functions
+#############################
+
+@st.cache_resource
+def load_embedding_model():
+    """Load and cache the sentence transformer model"""
+    return SentenceTransformer(CFG["EMBEDDING_MODEL"])
+
+def combine_note_text(note_name, note, url, tags):
+    """Combine note fields into a single text for embedding"""
+    parts = []
+    if note_name and note_name.strip():
+        parts.append(f"Title: {note_name.strip()}")
+    if note and note.strip():
+        parts.append(f"Content: {note.strip()}")
+    if url and url.strip():
+        parts.append(f"URL: {url.strip()}")
+    if tags and tags.strip():
+        parts.append(f"Tags: {tags.strip()}")
+    return " | ".join(parts)
+
+def build_faiss_index():
+    """Build or rebuild FAISS index from all notes"""
+    model = load_embedding_model()
+    
+    with DBConn() as _conn:
+        sql_stmt = f"""
+            SELECT id, note_name, note, url, tags 
+            FROM {CFG['TABLE_NOTE']} 
+            WHERE is_active = 1
+            ORDER BY id
+        """
+        df = pd.read_sql(sql_stmt, _conn)
+    
+    if df.empty:
+        return None, []
+    
+    texts = []
+    note_ids = []
+    
+    for _, row in df.iterrows():
+        combined_text = combine_note_text(
+            row['note_name'], row['note'], row['url'], row['tags']
+        )
+        texts.append(combined_text)
+        note_ids.append(row['id'])
+    
+    embeddings = model.encode(texts, convert_to_tensor=False)
+    
+    dimension = embeddings.shape[1]
+    index = faiss.IndexFlatIP(dimension)  # Inner Product for cosine similarity
+    
+    # Normalize embeddings for cosine similarity
+    faiss.normalize_L2(embeddings)
+    index.add(embeddings.astype('float32'))
+    
+    faiss.write_index(index, CFG["FAISS_INDEX_PATH"])
+    
+    return index, note_ids
+
+def load_faiss_index():
+    """Load existing FAISS index"""
+    try:
+        if os.path.exists(CFG["FAISS_INDEX_PATH"]):
+            index = faiss.read_index(CFG["FAISS_INDEX_PATH"])
+            
+            with DBConn() as _conn:
+                sql_stmt = f"""
+                    SELECT id FROM {CFG['TABLE_NOTE']} 
+                    WHERE is_active = 1 
+                    ORDER BY id
+                """
+                df = pd.read_sql(sql_stmt, _conn)
+                note_ids = df['id'].tolist()
+            
+            return index, note_ids
+        else:
+            return build_faiss_index()
+    except Exception as e:
+        logging.error(f"Error loading FAISS index: {e}")
+        return build_faiss_index()
+
+def semantic_search(query, top_k=10):
+    """Perform semantic search using FAISS"""
+    if not query or not query.strip():
+        return []
+    
+    try:
+        model = load_embedding_model()
+        index, note_ids = load_faiss_index()
+        
+        if index is None or not note_ids:
+            return []
+        
+        query_embedding = model.encode([query.strip()], convert_to_tensor=False)
+        faiss.normalize_L2(query_embedding)
+        
+        scores, indices = index.search(query_embedding.astype('float32'), min(top_k, len(note_ids)))
+        
+        results = []
+        for score, idx in zip(scores[0], indices[0]):
+            if idx < len(note_ids) and score > 0.1:  # threshold for relevance
+                results.append({
+                    'note_id': note_ids[idx],
+                    'similarity_score': float(score)
+                })
+        
+        return results
+    except Exception as e:
+        logging.error(f"Error in semantic search: {e}")
+        return []
+
+def refresh_faiss_index(show_messages=True):
+    """Rebuild FAISS index (call after adding/updating notes)"""
+    try:
+        build_faiss_index()
+        if show_messages:
+            st.success("Search index updated successfully!")
+    except Exception as e:
+        if show_messages:
+            st.error(f"Error updating search index: {e}")
+        logging.error(f"Error refreshing FAISS index: {e}")
+        raise e
 
