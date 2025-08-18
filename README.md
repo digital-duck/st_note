@@ -42,9 +42,9 @@ A modern, intelligent note-taking application built with Streamlit, featuring se
 
 ## 📸 Screenshots
 
-### Main Interface - Smart Search & Tag Filtering
-![Smart Notes Interface](docs/screenshot-main.png)
-*Advanced search with semantic capabilities and intelligent tag filtering*
+### Main Interface - Semantic Search in Action
+![Smart Notes Interface](docs/semantic-search-demo.png)
+*Semantic search finding "workflow orchestration" matches across different notes - showcasing AI-powered contextual understanding*
 
 ### Search Modes
 - **🔀 Hybrid**: Best of both keyword and semantic search
@@ -204,6 +204,26 @@ See `requirements.txt` for complete dependency list.
 ## 📄 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🚀 Future Enhancements
+
+### Unified Database Architecture
+Future versions could migrate to **PostgreSQL + pgvector** for a unified solution combining both RDBMS and vector capabilities:
+
+- **Single database** instead of SQLite + FAISS
+- **Native vector operations** with similarity search
+- **Advanced SQL queries** with vector filtering
+- **Better scalability** and concurrent access
+- **ACID compliance** for data integrity
+
+This would eliminate the dual-storage complexity while maintaining all current functionality.
+
+### Other Potential Features
+- Multi-language semantic search support
+- Automatic note clustering and categorization  
+- Smart note suggestions based on current content
+- Real-time collaborative editing
+- Advanced analytics and insights
 
 ## 🙏 Acknowledgments
 

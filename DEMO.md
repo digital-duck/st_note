@@ -124,9 +124,9 @@ Timestamps:
 > "Let me show you some really impressive semantic search examples. These searches will demonstrate how the AI understands concepts, not just keywords."
 
 **[Search examples to demonstrate:]**
-1. **"data processing"** → Should find ML pipeline note
-2. **"web interfaces"** → Should find Streamlit note  
-3. **"similarity search"** → Should find Vector databases note
+1. **"workflow orchestration"** → Finds FlowX, Prefect, and Claude-Flow notes (as shown in screenshot)
+2. **"data processing"** → Should find ML pipeline note
+3. **"web interfaces"** → Should find Streamlit note  
 4. **"automated coding"** → Should find Claude-Flow note
 
 > "This is powered by the 'all-MiniLM-L6-v2' sentence transformer model. It's lightweight but incredibly effective at understanding semantic relationships between words and concepts.
@@ -157,10 +157,11 @@ Timestamps:
 > "So there you have it - Smart Notes combines the reliability of traditional search with the intelligence of modern AI. Whether you're a developer taking technical notes, a researcher organizing papers, or just someone who wants smarter note organization, this kind of semantic search is a game-changer.
 >
 > Some ideas for extending this further:
+> - **PostgreSQL + pgvector migration** for unified RDBMS + vector storage
 > - **Multi-language support** with different embedding models
 > - **Note clustering** to automatically group related content  
 > - **Smart note suggestions** based on what you're currently writing
-> - **Integration with external APIs** for automatic content enrichment
+> - **Real-time collaborative editing** for team knowledge management
 >
 > The full source code and documentation are available in the repository - link in the description. The README has complete setup instructions, and there's even a migration script to get started with existing data.
 >

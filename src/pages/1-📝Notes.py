@@ -43,41 +43,71 @@ def do_note():
     tags = get_tags()
 
     # st.markdown("### 🔍 Search Notes")
-    filter_col1, search_col2, mode_col3, stat_col4 = st.columns([2, 3, 1, 2])
-    
-    with filter_col1:
+    filter_types, filter_tags, search_col2, mode_col3, stat_col4 = st.columns([1, 1, 2, 1, 1])
+
+    with filter_types:
+        search_types = st.multiselect("Filter by types:", options=CFG["NOTE_TYPE"], default=[])
+
+    with filter_tags:
         search_tags = st.multiselect("Filter by tags:", options=tags, default=[])
 
     with search_col2:
-        search_query = st.text_input("Search in notes (name, content, tags):", placeholder="Enter search terms...")
+        search_query = st.text_input("Search in Name, Description, URL:", placeholder="Enter search terms...")
     
     with mode_col3:
-        search_mode = st.selectbox("Search mode:", options=["Hybrid", "Semantic", "Keyword"], index=0)
+        search_mode = st.selectbox("Search mode:", options=["Hybrid", "Keyword", "Semantic"], index=0)
 
     df = None
     semantic_results = []
     
     # Handle semantic search
     if search_query and search_query.strip() and search_mode in ["Hybrid", "Semantic"]:
-        semantic_results = semantic_search(search_query.strip(), top_k=20)
+        top_k = st.session_state.get("top_k", 10)
+        score_threshold = st.session_state.get("score_threshold", 0.3)
+        selected_model = st.session_state.get("embedding_model", CFG["DEFAULT_EMBEDDING_MODEL"])
+        semantic_results = semantic_search(search_query.strip(), top_k=top_k, score_threshold=score_threshold, model_name=selected_model)
     
     with DBConn() as _conn:
         where_conditions = []
+        search_conditions = []  # For combining keyword + semantic
         
         # Handle keyword/text search
         if search_query and search_query.strip() and search_mode in ["Hybrid", "Keyword"]:
             search_term = escape_single_quote(search_query.strip())
-            where_conditions.append(f"""
+            keyword_condition = f"""
                 (note_name LIKE '%{search_term}%' 
-                OR note LIKE '%{search_term}%' 
-                OR tags LIKE '%{search_term}%')
-            """)
+                OR note LIKE '%{search_term}%'
+                OR url LIKE '%{search_term}%')
+            """
+            if search_mode == "Keyword":
+                where_conditions.append(keyword_condition)
+            else:  # Hybrid mode
+                search_conditions.append(keyword_condition)
         
         # Handle semantic search results
-        if semantic_results and search_mode in ["Hybrid", "Semantic"]:
-            semantic_ids = [str(result['note_id']) for result in semantic_results]
-            where_conditions.append(f"id IN ({','.join(semantic_ids)})")
+        if search_mode in ["Hybrid", "Semantic"]:
+            if semantic_results:
+                semantic_ids = [str(result['note_id']) for result in semantic_results]
+                semantic_condition = f"id IN ({','.join(semantic_ids)})"
+                if search_mode == "Semantic":
+                    where_conditions.append(semantic_condition)
+                else:  # Hybrid mode
+                    search_conditions.append(semantic_condition)
+            elif search_mode == "Semantic":
+                # For semantic-only mode with no results, return nothing
+                where_conditions.append("id = -1")  # This will match no rows
         
+        # Combine search conditions with OR for hybrid mode
+        if search_conditions:
+            where_conditions.append(f"({' OR '.join(search_conditions)})")
+        
+        if search_types:
+            typ_conditions = []
+            for typ in search_types:
+                escaped_typ = escape_single_quote(typ)
+                typ_conditions.append(f" note_type LIKE '%{escaped_typ}%'")
+            where_conditions.append(f"({' OR '.join(typ_conditions)})")
+
         if search_tags:
             tag_conditions = []
             for tag in search_tags:
@@ -95,9 +125,10 @@ def do_note():
                 note_name
                 , note 
                 , url 
+                , note_type
                 , tags
-                , is_active
                 , updated_at
+                , is_active
                 , id
             from {TABLE_NAME}
             {where_clause}
@@ -113,9 +144,9 @@ def do_note():
             df = df.sort_values('similarity_score', ascending=False).drop('similarity_score', axis=1)
 
     with stat_col4:
-        if (search_query or search_tags) and df is not None and not df.empty:
+        if (search_query or search_tags or search_types) and df is not None and not df.empty:
             mode_emoji = "🔀" if search_mode == "Hybrid" else "🧠" if search_mode == "Semantic" else "📝"
-            st.success(f"{mode_emoji} {len(df)} match found")
+            st.success(f"{mode_emoji} {len(df)} match(s)")
 
     grid_resp = ui_display_df_grid(df, 
                                    clickable_columns=["url"],
@@ -130,7 +161,24 @@ def do_note():
     # Sidebar - Advanced Options
     with st.sidebar:
         # st.markdown("---")
-        st.markdown("##### 🔧 Advanced Options")
+       
+        # Semantic search parameters
+        st.markdown("#### 🔧 **Semantic Search Controls**")
+        
+        # Embedding model selection
+        model_options = list(CFG["EMBEDDING_MODELS"].keys())
+        st.selectbox("Embedding Model", options=model_options, 
+                    index=model_options.index(CFG["DEFAULT_EMBEDDING_MODEL"]),
+                    help="English (Fast): Optimized for English-only content\nMultilingual (EN+CN): Supports Chinese and English with cross-language search",
+                    key="embedding_model")
+        
+        st.slider("Max Results (top_k)", min_value=5, max_value=50, value=10, step=5,
+                 help="Maximum number of results to return from semantic search", key="top_k")
+        
+        st.slider("Similarity Threshold", min_value=0.0, max_value=1.0, value=0.3, step=0.1,
+                 help="Minimum similarity score (0.0 = very loose, 1.0 = exact match)", key="score_threshold")
+        
+        st.markdown("---")
         
         refresh_tooltip = """Use this button only when needed:
         
@@ -142,9 +190,10 @@ def do_note():
 *Note: The search index automatically updates when you save/edit/delete notes through the app.*"""
         
         if st.button("🔄 Refresh Search Index", help=refresh_tooltip):
-            refresh_faiss_index()
+            selected_model = st.session_state.get("embedding_model", CFG["DEFAULT_EMBEDDING_MODEL"])
+            refresh_faiss_index(model_name=selected_model)
 
-    c_1, c_2 = st.columns([3,3])
+    c_1, c_2 = st.columns([1,3])
     with c_1:
         if df is not None and not df.empty:
             st.download_button(

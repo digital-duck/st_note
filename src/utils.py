@@ -83,12 +83,16 @@ CFG = {
     # assign table names
     "TABLE_NOTE" : "t_note",            # User Notes
 
-    "NOTE_TYPE": [BLANK_STR_VALUE, 'learning', 'research', 'project', 'journal'],
+    "NOTE_TYPE": [BLANK_STR_VALUE, 'application', 'project', 'meeting', 'journal', 'learning', 'research'],
     "STATUS_CODE": [BLANK_STR_VALUE, "ToDo","WIP", "Blocked", "Complete", "De-Scoped", "Others"],
 
     # semantic search config
-    "EMBEDDING_MODEL": "all-MiniLM-L6-v2",
-    "FAISS_INDEX_PATH": "./db/notes_faiss.index",
+    "EMBEDDING_MODELS": {
+        "English (Fast)": "all-MiniLM-L6-v2",
+        "Multilingual (EN+CN)": "paraphrase-multilingual-MiniLM-L12-v2"
+    },
+    "DEFAULT_EMBEDDING_MODEL": "English (Fast)",
+    "FAISS_INDEX_PATH": "./db/notes_faiss_{model}.index",
 
 }
 
@@ -952,8 +956,10 @@ def ui_layout_form(selected_row, table_name):
                 # Refresh FAISS index after any data change
                 if data_changed:
                     try:
-                        build_faiss_index()
-                        st.success("Note saved and search index updated!")
+                        # Rebuild indices for all available models
+                        for model_name in CFG["EMBEDDING_MODELS"].keys():
+                            build_faiss_index(model_name)
+                        st.success("Note saved and search indices updated!")
                     except Exception as idx_ex:
                         st.warning(f"Note saved but search index update failed: {idx_ex}")
                         logging.error(f"FAISS index refresh failed: {idx_ex}")
@@ -1213,11 +1219,24 @@ def prepend_chat_history(chat_history, question):
 #############################
 
 @st.cache_resource
-def load_embedding_model():
+def load_embedding_model(model_name=None):
     """Load and cache the sentence transformer model"""
-    return SentenceTransformer(CFG["EMBEDDING_MODEL"])
+    if model_name is None:
+        model_name = CFG["DEFAULT_EMBEDDING_MODEL"]
+    
+    model_id = CFG["EMBEDDING_MODELS"].get(model_name, CFG["EMBEDDING_MODELS"][CFG["DEFAULT_EMBEDDING_MODEL"]])
+    return SentenceTransformer(model_id)
 
-def combine_note_text(note_name, note, url, tags):
+def get_index_path(model_name=None):
+    """Get model-specific FAISS index path"""
+    if model_name is None:
+        model_name = CFG["DEFAULT_EMBEDDING_MODEL"]
+    
+    # Create safe filename from model name
+    safe_model_name = model_name.lower().replace(" ", "_").replace("(", "").replace(")", "")
+    return CFG["FAISS_INDEX_PATH"].format(model=safe_model_name)
+
+def combine_note_text(note_name, note, url):
     """Combine note fields into a single text for embedding"""
     parts = []
     if note_name and note_name.strip():
@@ -1226,17 +1245,15 @@ def combine_note_text(note_name, note, url, tags):
         parts.append(f"Content: {note.strip()}")
     if url and url.strip():
         parts.append(f"URL: {url.strip()}")
-    if tags and tags.strip():
-        parts.append(f"Tags: {tags.strip()}")
     return " | ".join(parts)
 
-def build_faiss_index():
+def build_faiss_index(model_name=None):
     """Build or rebuild FAISS index from all notes"""
-    model = load_embedding_model()
+    model = load_embedding_model(model_name)
     
     with DBConn() as _conn:
         sql_stmt = f"""
-            SELECT id, note_name, note, url, tags 
+            SELECT id, note_name, note, url
             FROM {CFG['TABLE_NOTE']} 
             WHERE is_active = 1
             ORDER BY id
@@ -1251,7 +1268,7 @@ def build_faiss_index():
     
     for _, row in df.iterrows():
         combined_text = combine_note_text(
-            row['note_name'], row['note'], row['url'], row['tags']
+            row['note_name'], row['note'], row['url']
         )
         texts.append(combined_text)
         note_ids.append(row['id'])
@@ -1265,15 +1282,17 @@ def build_faiss_index():
     faiss.normalize_L2(embeddings)
     index.add(embeddings.astype('float32'))
     
-    faiss.write_index(index, CFG["FAISS_INDEX_PATH"])
+    index_path = get_index_path(model_name)
+    faiss.write_index(index, index_path)
     
     return index, note_ids
 
-def load_faiss_index():
+def load_faiss_index(model_name=None):
     """Load existing FAISS index"""
     try:
-        if os.path.exists(CFG["FAISS_INDEX_PATH"]):
-            index = faiss.read_index(CFG["FAISS_INDEX_PATH"])
+        index_path = get_index_path(model_name)
+        if os.path.exists(index_path):
+            index = faiss.read_index(index_path)
             
             with DBConn() as _conn:
                 sql_stmt = f"""
@@ -1286,19 +1305,19 @@ def load_faiss_index():
             
             return index, note_ids
         else:
-            return build_faiss_index()
+            return build_faiss_index(model_name)
     except Exception as e:
         logging.error(f"Error loading FAISS index: {e}")
-        return build_faiss_index()
+        return build_faiss_index(model_name)
 
-def semantic_search(query, top_k=10):
+def semantic_search(query, top_k=10, score_threshold=0.1, model_name=None):
     """Perform semantic search using FAISS"""
     if not query or not query.strip():
         return []
     
     try:
-        model = load_embedding_model()
-        index, note_ids = load_faiss_index()
+        model = load_embedding_model(model_name)
+        index, note_ids = load_faiss_index(model_name)
         
         if index is None or not note_ids:
             return []
@@ -1310,7 +1329,7 @@ def semantic_search(query, top_k=10):
         
         results = []
         for score, idx in zip(scores[0], indices[0]):
-            if idx < len(note_ids) and score > 0.1:  # threshold for relevance
+            if idx < len(note_ids) and score > score_threshold:  # threshold for relevance
                 results.append({
                     'note_id': note_ids[idx],
                     'similarity_score': float(score)
@@ -1321,12 +1340,13 @@ def semantic_search(query, top_k=10):
         logging.error(f"Error in semantic search: {e}")
         return []
 
-def refresh_faiss_index(show_messages=True):
+def refresh_faiss_index(show_messages=True, model_name=None):
     """Rebuild FAISS index (call after adding/updating notes)"""
     try:
-        build_faiss_index()
+        build_faiss_index(model_name)
         if show_messages:
-            st.success("Search index updated successfully!")
+            model_display = model_name or CFG["DEFAULT_EMBEDDING_MODEL"]
+            st.success(f"Search index updated successfully for {model_display}!")
     except Exception as e:
         if show_messages:
             st.error(f"Error updating search index: {e}")

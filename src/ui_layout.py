@@ -13,19 +13,7 @@ COLUMN_PROPS = {
         'datatype': 'text',
         'form_column': 'COL_1-1',
         'widget_type': 'text_input',
-        'label_text': 'Title'
-    },
-    'url': {
-        'is_system_col': False,
-        'is_user_key': False,
-        'is_required': False,
-        'is_visible': True,
-        'is_editable': True,
-        'is_clickable': True,
-        'datatype': 'text',
-        'form_column': 'COL_1-2',
-        'widget_type': 'text_input',
-        'label_text': 'URL'
+        'label_text': 'Name'
     },
     'note': {
         'is_system_col': False,
@@ -35,23 +23,23 @@ COLUMN_PROPS = {
         'is_editable': True,
         'is_clickable': False,
         'datatype': 'text',
-        'form_column': 'COL_1-3',
+        'form_column': 'COL_1-2',
         'widget_type': 'text_area',
-        'label_text': 'Note'
+        'label_text': 'Description'
     },
 
     # Col_2
-    'id': {
-        'is_system_col': True,
+    'url': {
+        'is_system_col': False,
         'is_user_key': False,
-        'is_required': True,
+        'is_required': False,
         'is_visible': True,
-        'is_editable': False,
-        'is_clickable': False,
+        'is_editable': True,
+        'is_clickable': True,
         'datatype': 'text',
         'form_column': 'COL_2-1',
         'widget_type': 'text_input',
-        'label_text': 'ID'
+        'label_text': 'URL'
     },
     'note_type': {
         'is_system_col': False,
@@ -77,17 +65,18 @@ COLUMN_PROPS = {
         'widget_type': 'text_input',
         'label_text': 'Tags'
     },
-    'is_active': {
-        'is_system_col': False,
+    # Col_3
+    'id': {
+        'is_system_col': True,
         'is_user_key': False,
-        'is_required': False,
-        'is_visible': False,
-        'is_editable': True,
+        'is_required': True,
+        'is_visible': True,
+        'is_editable': False,
         'is_clickable': False,
         'datatype': 'text',
-        'form_column': 'COL_2-4',
-        'widget_type': 'selectbox',
-        'label_text': 'Active?'
+        'form_column': 'COL_3-1',
+        'widget_type': 'text_input',
+        'label_text': 'ID'
     },
 
     'updated_at': {
@@ -98,9 +87,21 @@ COLUMN_PROPS = {
         'is_editable': False,
         'is_clickable': False,
         'datatype': 'text',
-        'form_column': 'COL_2-5',
+        'form_column': 'COL_3-2',
         'widget_type': 'text_input',
         'label_text': 'Updated At'
+    },
+    'is_active': {
+        'is_system_col': False,
+        'is_user_key': False,
+        'is_required': False,
+        'is_visible': True,
+        'is_editable': True,
+        'is_clickable': False,
+        'datatype': 'text',
+        'form_column': 'COL_3-3',
+        'widget_type': 'selectbox',
+        'label_text': 'Active?'
     },
     'updated_by': {
         'is_system_col': False,
