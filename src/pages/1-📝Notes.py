@@ -163,7 +163,7 @@ def do_note():
         # st.markdown("---")
        
         # Semantic search parameters
-        st.markdown("#### 🔧 **Semantic Search Controls**")
+        st.markdown("#### 🔧 **Semantic Search Settings**")
         
         # Embedding model selection
         model_options = list(CFG["EMBEDDING_MODELS"].keys())

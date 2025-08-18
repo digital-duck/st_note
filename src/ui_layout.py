@@ -51,7 +51,7 @@ COLUMN_PROPS = {
         'datatype': 'text',
         'form_column': 'COL_2-2',
         'widget_type': 'selectbox',
-        'label_text': 'Note Type'
+        'label_text': 'Type'
     },
     'tags': {
         'is_system_col': False,
@@ -78,7 +78,6 @@ COLUMN_PROPS = {
         'widget_type': 'text_input',
         'label_text': 'ID'
     },
-
     'updated_at': {
         'is_system_col': False,
         'is_user_key': False,
@@ -89,7 +88,7 @@ COLUMN_PROPS = {
         'datatype': 'text',
         'form_column': 'COL_3-2',
         'widget_type': 'text_input',
-        'label_text': 'Updated At'
+        'label_text': 'Timestamp'
     },
     'is_active': {
         'is_system_col': False,

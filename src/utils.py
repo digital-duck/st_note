@@ -927,7 +927,7 @@ def ui_layout_form(selected_row, table_name):
                     delete_flag = st.checkbox("Delelte Record?", value=False)
                     data.update({col: delete_flag})
 
-        save_btn = st.form_submit_button(STR_SAVE)  
+        save_btn = st.form_submit_button(STR_SAVE, help="Double-click to save and refresh")  
         if save_btn:
             try:
                 delete_flag = data.get("delelte_record", False)
