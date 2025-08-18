@@ -83,7 +83,7 @@ CFG = {
     # assign table names
     "TABLE_NOTE" : "t_note",            # User Notes
 
-    "NOTE_TYPE": [BLANK_STR_VALUE, 'application', 'project', 'meeting', 'journal', 'learning', 'research'],
+    "NOTE_TYPE": [BLANK_STR_VALUE, 'application', 'project', 'task', 'meeting', 'log', 'learning', 'research', 'community', 'startup', 'others'],
     "STATUS_CODE": [BLANK_STR_VALUE, "ToDo","WIP", "Blocked", "Complete", "De-Scoped", "Others"],
 
     # semantic search config
