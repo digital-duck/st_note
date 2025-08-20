@@ -8,16 +8,16 @@ A modern, intelligent note-taking application built with Streamlit, featuring se
 - **Hybrid Search**: Combines traditional keyword search with AI-powered semantic search
 - **Semantic Search**: Understands context and meaning using sentence transformers
 - **Keyword Search**: Traditional SQL-based text matching
-- **Smart Tag Filtering**: Multi-select filtering with intelligent tag parsing
+- **Multi-Filtering**: by Note type, status, and tags
 
 ### 🧠 **AI-Powered Semantic Search**
 - Uses `all-MiniLM-L6-v2` model for fast, lightweight embeddings
+- Uses `paraphrase-multilingual-MiniLM-L12-v2` model for multilingual embeddings
 - FAISS vector store for efficient similarity search
 - Automatic index rebuilding on save/update/delete operations
 - Context-aware search that finds related content even without exact keyword matches
 
 ### 🏷️ **Intelligent Tag System**
-- Supports multiple delimiters (commas, spaces)
 - Automatic tag parsing and normalization
 - Individual tag filtering with multiselect dropdown
 - Case-insensitive tag matching
@@ -25,7 +25,7 @@ A modern, intelligent note-taking application built with Streamlit, featuring se
 ### 💾 **Data Management**
 - SQLite database for reliable data storage
 - Auto-save functionality with real-time index updates
-- CSV export capabilities
+- Import/Export via CSV for easy sharing and collaboration.
 - Clickable URL links in note entries
 
 ### 🎨 **Clean User Interface**
@@ -43,7 +43,10 @@ A modern, intelligent note-taking application built with Streamlit, featuring se
 ## 📸 Screenshots
 
 ### Main Interface - Semantic Search in Action
-![Smart Notes Interface](docs/st_note_2.png)
+[![Smart Notes Interface](https://github.com/digital-duck/st_note/blob/main/docs/st_note_2.png)](https://github.com/digital-duck/st_note/blob/main/docs/st_note_2.png)
+
+
+
 *Semantic search finding "workflow orchestration" matches across different notes - showcasing AI-powered contextual understanding*
 
 ### Search Modes
@@ -61,12 +64,16 @@ A modern, intelligent note-taking application built with Streamlit, featuring se
 
 1. **Clone the repository**
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/digital-duck/st_note.git
    cd st_note
    ```
 
 2. **Create and activate virtual environment**
    ```bash
+   conda create -n ai_workflow python=3.12
+   conda activate ai_workflow 
+
+   # or 
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
@@ -77,15 +84,17 @@ A modern, intelligent note-taking application built with Streamlit, featuring se
    ```
 
 4. **Initialize the database and vector index**
-   ```bash
-   # Run the migration script to build initial FAISS index
-   python src/migrate_vector_index.py
-   ```
+```bash
+# Run the migration script to build initial FAISS index
+cd src
+python migrate_vector_index.py
+```
 
 5. **Launch the application**
-   ```bash
-   streamlit run src/Welcome.py
-   ```
+```bash
+cd src
+streamlit run Welcome.py
+```
 
 6. **Access the app**
    - Open your browser to `http://localhost:8501`
@@ -97,23 +106,23 @@ A modern, intelligent note-taking application built with Streamlit, featuring se
 1. Navigate to the "📝 Notes" page
 2. Fill in the form with:
    - **Title**: Note name/title
-   - **Content**: Main note content
+   - **Description**: Note content
    - **URL/URL2/URL3**: Up to three optional related links
    - **Type**: Note category (learning, research, project, etc.)
    - **Tags**: Space or comma-separated tags
 3. Click "✅ Save" - the search index updates automatically
 
 ### Searching Notes
-1. **Text Search**: Enter keywords in the search box
-2. **Tag Filter**: Select specific tags from the dropdown
-3. **Search Mode**: Choose between Hybrid, Semantic, or Keyword search
-4. **View Results**: Click on any note to edit
+1. **Type/Status/Tag Filter**: Select specific tags from the dropdown
+2. **Search Mode**: Choose between Hybrid, Semantic, or Keyword search
+3. **Text Search**: Enter keywords in the search box
+4. **View Results**: Click on any note record to edit
 
 ### Import/Export Notes
 - **📤 Export Notes**: Download search results as CSV with timestamp
 - **📥 Import Notes**: Upload CSV files to bulk import notes
   - Required: `note_name` column
-  - Optional: `note`, `url`, `url2`, `url3`, `note_type`, `tags`, `is_active`
+  - Optional: `note`, `url`, `url2`, `url3`, `note_type`, `note_status`, `tags`, `is_active`
   - Duplicate detection uses composite key (`note_name` + `note_type`)
   - Options: Skip duplicates or update existing notes
   - Automatic search index refresh after import
@@ -139,9 +148,10 @@ src/
 ├── utils.py               # Core utilities & semantic search
 ├── ui_layout.py           # UI components & form layouts
 ├── migrate_vector_index.py # Initial index migration
+├── schema/
+│   └── tables_ddl.sql     # Database schema
 └── db/
     ├── notes.sqlite3      # SQLite database
-    ├── tables_ddl.sql     # Database schema
     └── notes_faiss.index  # FAISS vector index
 ```
 
@@ -154,6 +164,7 @@ CREATE TABLE t_note (
     url2 TEXT,
     url3 TEXT,
     note_type TEXT DEFAULT '',
+    note_status TEXT DEFAULT '',
     note TEXT,
     tags TEXT,
     is_active INTEGER DEFAULT 1 CHECK(is_active IN (0, 1)),
@@ -171,19 +182,21 @@ CREATE TABLE t_note (
 - Configurable in `utils.py` → `CFG["EMBEDDING_MODEL"]`
 
 ### Search Parameters
-- Similarity threshold: 0.1 (adjustable in `semantic_search()`)
-- Top-K results: 20 (configurable per search)
+- Similarity threshold: 0.3 (adjustable in `semantic_search()`)
+- Top-K results: 10 (configurable per search)
 
 ## 🛠️ Development
 
 ### Running in Development Mode
 ```bash
-streamlit run src/Welcome.py --server.headless false
+cd src
+streamlit run Welcome.py # --server.headless false
 ```
 
 ### Rebuilding Search Index
 ```bash
-python src/migrate_vector_index.py
+cd src
+python migrate_vector_index.py
 ```
 
 ### Adding New Features

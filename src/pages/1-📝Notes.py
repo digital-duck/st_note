@@ -191,7 +191,7 @@ def do_note():
     tags = get_tags()
 
     # st.markdown("### 🔍 Search Notes")
-    filter_type, filter_status, filter_tags, mode_col3, search_col2, clear_col, stat_col4 = st.columns([1, 1, 1, 1, 2, 0.5, 1])
+    filter_type, filter_status, filter_tags, mode_col3, search_col2, stat_col4 = st.columns([1, 1, 1, 1, 2, 1])
 
     with filter_type:
         search_type = st.selectbox("Note type:", options=CFG["NOTE_TYPE"], index=0, key="filter_note_type")
@@ -205,18 +205,7 @@ def do_note():
     with search_col2:
         search_query = st.text_input("Search in Name, Description, URL:", placeholder="Enter search terms...", key="search_query")
     
-    with clear_col:
-        st.write("")  # Add some vertical space
-        if st.button("🧹 Clear", help="Clear all search filters"):
-            # Clear specific search widget keys
-            search_keys = ["filter_note_type", "filter_status", "filter_tags", "search_query", "search_mode"]
-            for key in search_keys:
-                if key in st.session_state:
-                    del st.session_state[key]
-            # Debug: show what keys exist
-            # st.write("Session keys:", [k for k in st.session_state.keys() if 'search' in k.lower() or 'filter' in k.lower()])
-            st.rerun()
-    
+   
     with mode_col3:
         search_mode = st.selectbox("Search mode:", options=["Hybrid", "Keyword", "Semantic"], index=0, key="search_mode")
 

@@ -1002,19 +1002,20 @@ def ui_layout_form(selected_row, table_name):
         except Exception as e:
             pass # ignore
 
-    # Clear Form button outside the form
-    if st.button("🧹 Clear Form", help="Clear all form fields"):
-        try:
-            # Clear all form-related session state keys for this table
-            form_prefix = f"col_{form_name}_"
-            keys_to_clear = [key for key in st.session_state.keys() if key.startswith(form_prefix)]
-            for key in keys_to_clear:
-                del st.session_state[key]
-            st.success("Form cleared!")
-            st.rerun()
-        except Exception as e:
-            st.error(f"Error clearing form: {e}")
-            pass # ignore
+    ### Clear Form does not work
+    # # Clear Form button outside the form
+    # if st.button("🧹 Clear Form", help="Clear all form fields"):
+    #     try:
+    #         # Clear all form-related session state keys for this table
+    #         form_prefix = f"col_{form_name}_"
+    #         keys_to_clear = [key for key in st.session_state.keys() if key.startswith(form_prefix)]
+    #         for key in keys_to_clear:
+    #             del st.session_state[key]
+    #         st.success("Form cleared!")
+    #         st.rerun()
+    #     except Exception as e:
+    #         st.error(f"Error clearing form: {e}")
+    #         pass # ignore
 
 
 def ui_display_df_grid(df, 

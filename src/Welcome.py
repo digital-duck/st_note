@@ -10,6 +10,10 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+
+SRC_IMG_PATH = "../docs/st_note_2.png"
+
+
 @st.cache_data(ttl=3600)
 def create_tables(file_ddl: str = CFG["META_DB_DDL"]):
     # run a test query
