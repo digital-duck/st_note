@@ -98,7 +98,8 @@ A modern, intelligent note-taking application built with Streamlit, featuring se
 2. Fill in the form with:
    - **Title**: Note name/title
    - **Content**: Main note content
-   - **URL**: Optional related links
+   - **URL/URL2/URL3**: Up to three optional related links
+   - **Type**: Note category (learning, research, project, etc.)
    - **Tags**: Space or comma-separated tags
 3. Click "✅ Save" - the search index updates automatically
 
@@ -108,10 +109,18 @@ A modern, intelligent note-taking application built with Streamlit, featuring se
 3. **Search Mode**: Choose between Hybrid, Semantic, or Keyword search
 4. **View Results**: Click on any note to edit
 
+### Import/Export Notes
+- **📤 Export Notes**: Download search results as CSV with timestamp
+- **📥 Import Notes**: Upload CSV files to bulk import notes
+  - Required: `note_name` column
+  - Optional: `note`, `url`, `url2`, `url3`, `note_type`, `tags`, `is_active`
+  - Duplicate detection uses composite key (`note_name` + `note_type`)
+  - Options: Skip duplicates or update existing notes
+  - Automatic search index refresh after import
+
 ### Advanced Features
-- **Export**: Download all notes as CSV
 - **Manual Index Refresh**: Use sidebar button for troubleshooting
-- **Tag Management**: View all available tags in the bottom panel
+- **Tag Management**: View all available tags organized by usage
 
 ## 🏗️ Architecture
 
@@ -142,10 +151,12 @@ CREATE TABLE t_note (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     note_name TEXT NOT NULL,
     url TEXT,
-    note_type TEXT CHECK(note_type IN ('', 'learning', 'research', 'project', 'journal')),
+    url2 TEXT,
+    url3 TEXT,
+    note_type TEXT DEFAULT '',
     note TEXT,
     tags TEXT,
-    is_active INTEGER DEFAULT 1,
+    is_active INTEGER DEFAULT 1 CHECK(is_active IN (0, 1)),
     created_at TEXT,
     updated_at TEXT,
     created_by TEXT NOT NULL,

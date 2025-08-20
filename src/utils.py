@@ -568,7 +568,8 @@ PROPS = [
     'form_column',
     'widget_type',
     'label_text',
-    'kwargs'
+    'kwargs',
+    'tooltip'
 ]
 
 
@@ -760,22 +761,23 @@ def parse_column_props():
     return col_defs
 
 def ui_layout_form_fields(data,form_name,old_row,col,
-                        widget_types,col_labels,system_columns):
+                        widget_types,col_labels,system_columns,col_tooltips=None):
     DISABLED = col in system_columns
     key_name_field = f"col_{form_name}_{col}"
+    tooltip = col_tooltips.get(col, "") if col_tooltips else ""
     if old_row:
         old_val = old_row.get(col, "")
         widget_type = widget_types.get(col, "text_input")
         if widget_type == "text_area":
             kwargs = {"height":125}
-            val = st.text_area(col_labels.get(col), value=old_val, disabled=DISABLED, key=key_name_field, kwargs=kwargs)
+            val = st.text_area(col_labels.get(col), value=old_val, disabled=DISABLED, key=key_name_field, help=tooltip, **kwargs)
         elif widget_type == "date_input":
             old_date_input = old_val.split("T")[0]
             if old_date_input:
                 val_date = datetime.strptime(old_date_input, "%Y-%m-%d")
             else:
                 val_date = datetime.now().date()
-            val = st.date_input(col_labels.get(col), value=val_date, disabled=DISABLED, key=key_name_field)
+            val = st.date_input(col_labels.get(col), value=val_date, disabled=DISABLED, key=key_name_field, help=tooltip)
             val = datetime.strftime(val, "%Y-%m-%d")
         elif widget_type == "time_input":
             old_time_input = old_val
@@ -783,7 +785,7 @@ def ui_layout_form_fields(data,form_name,old_row,col,
                 val_time = datetime.strptime(old_time_input.split(".")[0], "%H:%M:%S").time()
             else:
                 val_time = datetime.now().time()
-            val = st.time_input(col_labels.get(col), value=val_time, disabled=DISABLED, key=key_name_field)
+            val = st.time_input(col_labels.get(col), value=val_time, disabled=DISABLED, key=key_name_field, help=tooltip)
         elif widget_type == "selectbox":
             # check if options is avail, otherwise display as text_input
             if col in SELECTBOX_OPTIONS:
@@ -791,25 +793,25 @@ def ui_layout_form_fields(data,form_name,old_row,col,
                     _options = SELECTBOX_OPTIONS.get(col,[])
                     old_val = old_row.get(col, BLANK_STR_VALUE)
                     _idx = _options.index(old_val)
-                    val = st.selectbox(col_labels.get(col), _options, index=_idx, key=key_name_field)
+                    val = st.selectbox(col_labels.get(col), _options, index=_idx, key=key_name_field, help=tooltip)
                 except ValueError:
                     val = old_row.get(col, "")
             else:
-                val = st.text_input(col_labels.get(col), value=old_val, disabled=DISABLED, key=key_name_field)
+                val = st.text_input(col_labels.get(col), value=old_val, disabled=DISABLED, key=key_name_field, help=tooltip)
         elif widget_type == "multiselect":
             # check if options is avail, otherwise display as text_input
             if col in SELECTBOX_OPTIONS:
                 try:
                     _options = SELECTBOX_OPTIONS.get(col,[])
                     old_val = old_row.get(col, BLANK_STR_VALUE).split(",")
-                    val = st.multiselect(col_labels.get(col), _options, default=old_val, key=key_name_field)
+                    val = st.multiselect(col_labels.get(col), _options, default=old_val, key=key_name_field, help=tooltip)
                 except ValueError:
                     val = old_row.get(col, "")
             else:
-                val = st.text_input(col_labels.get(col), value=old_val, disabled=DISABLED, key=key_name_field)
+                val = st.text_input(col_labels.get(col), value=old_val, disabled=DISABLED, key=key_name_field, help=tooltip)
 
         else:
-            val = st.text_input(col_labels.get(col), value=old_val, disabled=DISABLED, key=key_name_field)
+            val = st.text_input(col_labels.get(col), value=old_val, disabled=DISABLED, key=key_name_field, help=tooltip)
 
         if val != old_val:
             data.update({col : val})
@@ -827,6 +829,7 @@ def ui_layout_form(selected_row, table_name):
     form_columns = COL_DEFS["form_column"]
     col_labels = COL_DEFS["label_text"]
     widget_types = COL_DEFS["widget_type"]
+    col_tooltips = COL_DEFS.get("tooltip", {})
 
     old_row = {}
     for col in visible_columns:
@@ -861,13 +864,13 @@ def ui_layout_form(selected_row, table_name):
             with st_cols[id_col]:
                 for col in col_col[col_prefix[id_col]]:
                     data = ui_layout_form_fields(data,form_name,old_row,col,
-                                widget_types,col_labels,system_columns)
+                                widget_types,col_labels,system_columns,col_tooltips)
                     key_names.append(f"col_{form_name}_{col}")
 
                 if id_col == len(st_cols)-1:
                     # add checkbox for deleting this record
                     col = "delelte_record"
-                    delete_flag = st.checkbox("Delelte Record?", value=False)
+                    delete_flag = st.checkbox("Hard-delete Record?", value=False)
                     data.update({col: delete_flag})
 
         id_col = 1
@@ -875,13 +878,13 @@ def ui_layout_form(selected_row, table_name):
             with st_cols[id_col]:
                 for col in col_col[col_prefix[id_col]]:
                     data = ui_layout_form_fields(data,form_name,old_row,col,
-                                widget_types,col_labels,system_columns)
+                                widget_types,col_labels,system_columns,col_tooltips)
                     key_names.append(f"col_{form_name}_{col}")
 
                 if id_col == len(st_cols)-1:
                     # add checkbox for deleting this record
                     col = "delelte_record"
-                    delete_flag = st.checkbox("Delelte Record?", value=False)
+                    delete_flag = st.checkbox("Hard-delete Record?", value=False)
                     data.update({col: delete_flag})
 
         id_col = 2
@@ -889,13 +892,13 @@ def ui_layout_form(selected_row, table_name):
             with st_cols[id_col]:
                 for col in col_col[col_prefix[id_col]]:
                     data = ui_layout_form_fields(data,form_name,old_row,col,
-                                widget_types,col_labels,system_columns)
+                                widget_types,col_labels,system_columns,col_tooltips)
                     key_names.append(f"col_{form_name}_{col}")
 
                 if id_col == len(st_cols)-1:
                     # add checkbox for deleting this record
                     col = "delelte_record"
-                    delete_flag = st.checkbox("Delelte Record?", value=False)
+                    delete_flag = st.checkbox("Hard-delete Record?", value=False)
                     data.update({col: delete_flag})
 
 
@@ -904,13 +907,13 @@ def ui_layout_form(selected_row, table_name):
             with st_cols[id_col]:
                 for col in col_col[col_prefix[id_col]]:
                     data = ui_layout_form_fields(data,form_name,old_row,col,
-                                widget_types,col_labels,system_columns)
+                                widget_types,col_labels,system_columns,col_tooltips)
                     key_names.append(f"col_{form_name}_{col}")
 
                 if id_col == len(st_cols)-1:
                     # add checkbox for deleting this record
                     col = "delelte_record"
-                    delete_flag = st.checkbox("Delelte Record?", value=False)
+                    delete_flag = st.checkbox("Hard-delete Record?", value=False)
                     data.update({col: delete_flag})
 
         id_col = 4
@@ -918,13 +921,13 @@ def ui_layout_form(selected_row, table_name):
             with st_cols[id_col]:
                 for col in col_col[col_prefix[id_col]]:
                     data = ui_layout_form_fields(data,form_name,old_row,col,
-                                widget_types,col_labels,system_columns)
+                                widget_types,col_labels,system_columns,col_tooltips)
                     key_names.append(f"col_{form_name}_{col}")
 
                 if id_col == len(st_cols)-1:
                     # add checkbox for deleting this record
                     col = "delelte_record"
-                    delete_flag = st.checkbox("Delelte Record?", value=False)
+                    delete_flag = st.checkbox("Hard-delete Record?", value=False)
                     data.update({col: delete_flag})
 
         save_btn = st.form_submit_button(STR_SAVE, help="Double-click to save and refresh")  
@@ -1236,7 +1239,7 @@ def get_index_path(model_name=None):
     safe_model_name = model_name.lower().replace(" ", "_").replace("(", "").replace(")", "")
     return CFG["FAISS_INDEX_PATH"].format(model=safe_model_name)
 
-def combine_note_text(note_name, note, url):
+def combine_note_text(note_name, note, url, url2, url3):
     """Combine note fields into a single text for embedding"""
     parts = []
     if note_name and note_name.strip():
@@ -1245,6 +1248,10 @@ def combine_note_text(note_name, note, url):
         parts.append(f"Content: {note.strip()}")
     if url and url.strip():
         parts.append(f"URL: {url.strip()}")
+    if url2 and url2.strip():
+        parts.append(f"URL: {url2.strip()}")
+    if url3 and url3.strip():
+        parts.append(f"URL: {url3.strip()}")
     return " | ".join(parts)
 
 def build_faiss_index(model_name=None):
@@ -1253,7 +1260,7 @@ def build_faiss_index(model_name=None):
     
     with DBConn() as _conn:
         sql_stmt = f"""
-            SELECT id, note_name, note, url
+            SELECT id, note_name, note, url, url2, url3
             FROM {CFG['TABLE_NOTE']} 
             WHERE is_active = 1
             ORDER BY id
@@ -1268,7 +1275,7 @@ def build_faiss_index(model_name=None):
     
     for _, row in df.iterrows():
         combined_text = combine_note_text(
-            row['note_name'], row['note'], row['url']
+            row['note_name'], row['note'], row['url'], row['url2'], row['url3']
         )
         texts.append(combined_text)
         note_ids.append(row['id'])

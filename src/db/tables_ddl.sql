@@ -5,7 +5,9 @@ CREATE TABLE if not exists t_note
 
     , note_name text NOT NULL
     , url text 
-	, note_type TEXT DEFAULT '' CHECK(note_type IN ('', 'learning', 'research', 'project', 'journal'))
+    , url2 text 
+    , url3 text 
+	, note_type TEXT DEFAULT ''
 	, note text
 	, tags text
 

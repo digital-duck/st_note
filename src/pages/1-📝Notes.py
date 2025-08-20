@@ -38,6 +38,154 @@ def get_tags():
     
     return sorted(list(unique_tags))
 
+def import_notes_from_csv(import_df, skip_duplicates=True, update_existing=False):
+    """Import notes from CSV DataFrame with validation and error handling"""
+    
+    # Define expected columns and their defaults
+    expected_columns = {
+        'note_name': '',
+        'note': '',
+        'url': '',
+        'url2': '',
+        'url3': '',
+        'note_type': '',
+        'tags': '',
+        'is_active': 1
+    }
+    
+    # Prepare import data
+    success_count = 0
+    error_count = 0
+    skip_count = 0
+    update_count = 0
+    errors = []
+    
+    # Progress indicators
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    try:
+        for index, row in import_df.iterrows():
+            try:
+                # Update progress
+                progress = (index + 1) / len(import_df)
+                progress_bar.progress(progress)
+                note_display = f"{row.get('note_name', 'Unnamed')}"
+                if row.get('note_type'):
+                    note_display += f" ({row.get('note_type')})"
+                status_text.text(f"Processing row {index + 1}/{len(import_df)}: {note_display}")
+                
+                # Validate required fields
+                if not row.get('note_name') or pd.isna(row.get('note_name')):
+                    errors.append(f"Row {index + 1}: Missing note_name")
+                    error_count += 1
+                    continue
+                
+                # Check for duplicates using composite key (note_name, note_type)
+                note_name = str(row['note_name']).strip()
+                note_type = str(row.get('note_type', '')).strip()
+                
+                # Check if note with same name AND type already exists
+                with DBConn() as _conn:
+                    check_sql = f"""
+                        SELECT id FROM {TABLE_NAME} 
+                        WHERE note_name = '{escape_single_quote(note_name)}'
+                        AND note_type = '{escape_single_quote(note_type)}'
+                        LIMIT 1
+                    """
+                    existing = pd.read_sql(check_sql, _conn)
+                
+                if not existing.empty:
+                    if skip_duplicates and not update_existing:
+                        skip_count += 1
+                        continue
+                    elif update_existing:
+                        # Update existing note
+                        existing_id = existing.iloc[0]['id']
+                        update_data = {
+                            'table_name': TABLE_NAME,
+                            'id': existing_id,
+                            'updated_at': get_ts_now(),
+                            'updated_by': DEFAULT_USER
+                        }
+                        
+                        # Add all available columns from CSV
+                        for col, default_val in expected_columns.items():
+                            if col in row and not pd.isna(row[col]):
+                                update_data[col] = str(row[col]).strip()
+                            elif col not in ['table_name', 'id', 'updated_at', 'updated_by']:
+                                update_data[col] = default_val
+                        
+                        db_update_by_id(update_data, update_changed=False)
+                        update_count += 1
+                        continue
+                
+                # Prepare new note data
+                note_data = {
+                    'table_name': TABLE_NAME,
+                    'created_at': get_ts_now(),
+                    'updated_at': get_ts_now(),
+                    'created_by': DEFAULT_USER,
+                    'updated_by': DEFAULT_USER
+                }
+                
+                # Add all available columns from CSV
+                for col, default_val in expected_columns.items():
+                    if col in row and not pd.isna(row[col]):
+                        note_data[col] = str(row[col]).strip()
+                    else:
+                        note_data[col] = default_val
+                
+                # Insert new note
+                db_upsert(note_data)
+                success_count += 1
+                
+            except Exception as row_error:
+                error_count += 1
+                errors.append(f"Row {index + 1} ({row.get('note_name', 'Unknown')}): {str(row_error)}")
+                logging.error(f"Import error on row {index + 1}: {row_error}")
+        
+        # Clear progress indicators
+        progress_bar.empty()
+        status_text.empty()
+        
+        # Show results
+        if success_count > 0:
+            st.success(f"✅ Successfully imported {success_count} notes!")
+        if update_count > 0:
+            st.info(f"🔄 Updated {update_count} existing notes")
+        if skip_count > 0:
+            st.warning(f"⏭️ Skipped {skip_count} duplicate notes")
+        if error_count > 0:
+            st.error(f"❌ Failed to import {error_count} notes")
+            
+            # Show first few errors
+            if errors:
+                with st.expander("🐛 Error Details", expanded=False):
+                    for error in errors[:10]:  # Show first 10 errors
+                        st.text(error)
+                    if len(errors) > 10:
+                        st.text(f"... and {len(errors) - 10} more errors")
+        
+        # Refresh search index if any notes were imported/updated
+        if success_count > 0 or update_count > 0:
+            try:
+                selected_model = st.session_state.get("embedding_model", CFG["DEFAULT_EMBEDDING_MODEL"])
+                refresh_faiss_index(show_messages=False, model_name=selected_model)
+                st.success("🔍 Search index updated automatically!")
+            except Exception as idx_error:
+                st.warning(f"Notes imported but search index update failed: {idx_error}")
+        
+        # Auto-refresh the page data
+        if success_count > 0 or update_count > 0:
+            st.rerun()
+            
+    except Exception as e:
+        st.error(f"Import failed: {str(e)}")
+        logging.error(f"CSV import error: {e}")
+        progress_bar.empty()
+        status_text.empty()
+
 def do_note():
     # get distinct tags
     tags = get_tags()
@@ -125,6 +273,8 @@ def do_note():
                 note_name
                 , note 
                 , url 
+                , url2 
+                , url3 
                 , note_type
                 , tags
                 , updated_at
@@ -149,15 +299,96 @@ def do_note():
             st.success(f"{mode_emoji} {len(df)} match(s)")
 
     grid_resp = ui_display_df_grid(df, 
-                                   clickable_columns=["url"],
+                                   clickable_columns=["url","url2","url3"],
                                    selection_mode="single")
     selected_rows = grid_resp['selected_rows']
 
     selected_row = None if selected_rows is None or len(selected_rows) < 1 else selected_rows.to_dict(orient='records')[0]
-
     # display form
     ui_layout_form(selected_row, TABLE_NAME)
     
+    st.divider()
+
+
+    c_2, c_1, c_3 = st.columns([2,2,4])
+    with c_1:
+        with st.expander("Export Notes to CSV", expanded=False):
+            if df is not None and not df.empty:
+                st.download_button(
+                    label="Export",
+                    data=df_to_csv(df, index=False),
+                    file_name=f"notes-{get_ts_now()}.csv",
+                    mime='text/csv',
+                    help="Export notes to share",
+                    type="primary"
+                )
+    with c_2:
+        with st.expander("Import Notes from CSV", expanded=False):
+
+            # CSV Import functionality
+            uploaded_file = st.file_uploader(
+                "Import",
+                type=['csv'],
+                help="Upload a CSV file with notes. Required: note_name. Optional: note, url, url2, url3, note_type, tags. Duplicates detected by (note_name + note_type) combination.",
+                key="csv_import"
+            )
+        
+            if uploaded_file is not None:
+                try:
+                    # Read uploaded CSV
+                    import_df = pd.read_csv(uploaded_file)
+                    
+                    # Validate required columns
+                    required_cols = ['note_name']
+                    missing_cols = [col for col in required_cols if col not in import_df.columns]
+                    
+                    if missing_cols:
+                        st.error(f"Missing required columns: {', '.join(missing_cols)}")
+                    else:
+                        # Show preview
+                        st.success(f"📁 Ready to import {len(import_df)} notes")
+                        
+                        # Data preview
+                        with st.expander("📋 Preview Import Data", expanded=False):
+                            st.dataframe(import_df.head(10))
+                            if len(import_df) > 10:
+                                st.info(f"Showing first 10 rows. Total: {len(import_df)} rows")
+                        
+                        # Import options
+                        col_opt2, col_opt1 = st.columns(2)
+                        with col_opt1:
+                            skip_duplicates = st.checkbox(
+                                "Skip duplicates", 
+                                value=True,
+                                help="Skip notes with same (note_name + note_type) combination"
+                            )
+                        with col_opt2:
+                            update_existing = st.checkbox(
+                                "Update existing", 
+                                value=True,
+                                help="Update notes if (note_name + note_type) combination already exists"
+                            )
+                        
+                        # Import button
+                        if st.button("🚀 Import Notes", type="primary"):
+                            import_notes_from_csv(import_df, skip_duplicates, update_existing)
+                            
+                except Exception as e:
+                    st.error(f"Error reading CSV file: {str(e)}")
+                    st.info("Please ensure your CSV file is properly formatted with UTF-8 encoding.")
+
+    with c_3:
+        with st.expander("Display Tags", expanded=False):
+            if tags:
+                tag_str = " | ".join(tags)  # tags are already sorted and unique from get_tags()
+                st.markdown(f"""
+                    ##### Tags ({len(tags)})
+                    {tag_str}
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown("##### No tags found")
+
+def show_sidebar():
     # Sidebar - Advanced Options
     with st.sidebar:
         # st.markdown("---")
@@ -193,27 +424,9 @@ def do_note():
             selected_model = st.session_state.get("embedding_model", CFG["DEFAULT_EMBEDDING_MODEL"])
             refresh_faiss_index(model_name=selected_model)
 
-    c_1, c_2 = st.columns([1,3])
-    with c_1:
-        if df is not None and not df.empty:
-            st.download_button(
-                label="Download CSV",
-                data=df_to_csv(df, index=False),
-                file_name=f"notes-{get_ts_now()}.csv",
-                mime='text/csv',
-            )
-    with c_2:
-        if tags:
-            tag_str = " , ".join(tags)  # tags are already sorted and unique from get_tags()
-            st.markdown(f"""
-                ##### Available Tags ({len(tags)})
-                {tag_str}
-            """, unsafe_allow_html=True)
-        else:
-            st.markdown("##### No tags found")
-
 def main():
     try:
+        show_sidebar()
         do_note()
     except Exception as e:
         st.error(str(e))   

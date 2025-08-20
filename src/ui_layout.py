@@ -27,6 +27,18 @@ COLUMN_PROPS = {
         'widget_type': 'text_area',
         'label_text': 'Description'
     },
+    'note_type': {
+        'is_system_col': False,
+        'is_user_key': False,
+        'is_required': False,
+        'is_visible': True,
+        'is_editable': True,
+        'is_clickable': False,
+        'datatype': 'text',
+        'form_column': 'COL_1-3',
+        'widget_type': 'selectbox',
+        'label_text': 'Type'
+    },
 
     # Col_2
     'url': {
@@ -39,20 +51,36 @@ COLUMN_PROPS = {
         'datatype': 'text',
         'form_column': 'COL_2-1',
         'widget_type': 'text_input',
-        'label_text': 'URL'
+        'label_text': 'URL',
+        'tooltip': 'Store YouTube link or primary URL reference'
     },
-    'note_type': {
+    'url2': {
         'is_system_col': False,
         'is_user_key': False,
         'is_required': False,
         'is_visible': True,
         'is_editable': True,
-        'is_clickable': False,
+        'is_clickable': True,
         'datatype': 'text',
         'form_column': 'COL_2-2',
-        'widget_type': 'selectbox',
-        'label_text': 'Type'
+        'widget_type': 'text_input',
+        'label_text': 'URL2',
+        'tooltip': 'Store GitHub link or secondary URL reference'
     },
+    'url3': {
+        'is_system_col': False,
+        'is_user_key': False,
+        'is_required': False,
+        'is_visible': True,
+        'is_editable': True,
+        'is_clickable': True,
+        'datatype': 'text',
+        'form_column': 'COL_2-3',
+        'widget_type': 'text_input',
+        'label_text': 'URL3',
+        'tooltip': 'Store documentation link or additional reference'
+    },
+    # Col_3
     'tags': {
         'is_system_col': False,
         'is_user_key': False,
@@ -61,22 +89,10 @@ COLUMN_PROPS = {
         'is_editable': True,
         'is_clickable': False,
         'datatype': 'text',
-        'form_column': 'COL_2-3',
-        'widget_type': 'text_input',
-        'label_text': 'Tags'
-    },
-    # Col_3
-    'id': {
-        'is_system_col': True,
-        'is_user_key': False,
-        'is_required': True,
-        'is_visible': True,
-        'is_editable': False,
-        'is_clickable': False,
-        'datatype': 'text',
         'form_column': 'COL_3-1',
         'widget_type': 'text_input',
-        'label_text': 'ID'
+        'label_text': 'Tags',
+        'tooltip': 'Enter tags separated by commas or spaces (e.g., "ai, python, streamlit")'
     },
     'updated_at': {
         'is_system_col': False,
@@ -101,6 +117,18 @@ COLUMN_PROPS = {
         'form_column': 'COL_3-3',
         'widget_type': 'selectbox',
         'label_text': 'Active?'
+    },
+    'id': {
+        'is_system_col': True,
+        'is_user_key': False,
+        'is_required': True,
+        'is_visible': False,
+        'is_editable': False,
+        'is_clickable': False,
+        'datatype': 'text',
+        'form_column': 'COL_3-4',
+        'widget_type': 'text_input',
+        'label_text': 'ID'
     },
     'updated_by': {
         'is_system_col': False,
