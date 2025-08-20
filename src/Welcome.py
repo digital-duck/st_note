@@ -21,4 +21,14 @@ def create_tables(file_ddl: str = CFG["META_DB_DDL"]):
 if __name__ == '__main__':
     # create tables if missing
     create_tables()
+    
+    # Display README content
+    try:
+        with open("../README.md", "r", encoding="utf-8") as f:
+            readme_content = f.read()
+        st.markdown(readme_content)
+    except FileNotFoundError:
+        st.warning("README.md file not found")
+    except Exception as e:
+        st.error(f"Error reading README.md: {str(e)}")
 

@@ -19,6 +19,10 @@ import jsonlines
 from time import time
 
 import click   # CLI interface
+import getpass
+import socket
+import os
+
 
 # special libs
 from bs4 import BeautifulSoup
@@ -52,16 +56,25 @@ if not log_path.exists():
     with open(log_path, 'w'):
         pass
 
-logging.basicConfig(
-    level=logging.INFO,  # Set the minimum logging level
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    filename=log_path  # Optional: write to a file instead of console
-)
+def get_user_id():
+    """Return tuple of (username, hostname) - cross-platform"""
+    try:
+        user_name = getpass.getuser()
+    except:
+        user_name = os.environ.get('USER', os.environ.get('USERNAME', 'unknown'))
+
+    try:
+        user_node = socket.gethostname()
+    except:
+        user_node = 'unknown'
+
+    return f"{user_name}@{user_node}"
 
 #############################
 # Config params (1st)
 #############################
-DEFAULT_USER = "admin"
+CURRENT_USER = get_user_id()
+
 DEFAULT_DB_DIALECT = "sqlite"
 
 BLANK_STR_VALUE = ""   # place-holder blank LOV value
@@ -74,17 +87,17 @@ STR_SAVE = "✅ Save" # 💾
 DB_PATH_SQLITE = "db/notes.sqlite3"
 
 CFG = {
-    "DEBUG_FLAG" : True, # False, # 
+    "DEBUG_FLAG" : False, # True, # 
     "SQL_EXECUTION_FLAG" : True, #  False, #   control SQL
     
     "META_DB_URL" : "./db/notes.sqlite3",
-    "META_DB_DDL" : "./db/tables_ddl.sql",
+    "META_DB_DDL" : "./schema/tables_ddl.sql",
 
     # assign table names
     "TABLE_NOTE" : "t_note",            # User Notes
 
     "NOTE_TYPE": [BLANK_STR_VALUE, 'application', 'project', 'task', 'meeting', 'log', 'learning', 'research', 'community', 'startup', 'others'],
-    "STATUS_CODE": [BLANK_STR_VALUE, "ToDo","WIP", "Blocked", "Complete", "De-Scoped", "Others"],
+    "STATUS_CODE": [BLANK_STR_VALUE, "ToDo","WIP", "Done", "Blocked", "De-Scoped", "Others"],
 
     # semantic search config
     "EMBEDDING_MODELS": {
@@ -104,8 +117,15 @@ TRI_STATES = ["Y", BLANK_STR_VALUE, None,]
 SELECTBOX_OPTIONS = {
     "is_active": [0,1],
     "note_type": CFG["NOTE_TYPE"],
+    "note_status": CFG["STATUS_CODE"],
 }
 
+
+logging.basicConfig(
+    level=logging.DEBUG if CFG["DEBUG_FLAG"] else logging.INFO,  # Set the minimum logging level
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    filename=log_path  # Optional: write to a file instead of console
+)
 
 
 def fix_None_val(v):
@@ -138,6 +158,7 @@ class DBUtils():
         if not sql_stmt:
             return
         
+        debug_print(f"[DEBUG] {sql_stmt}")
         if conn is None:
             # create new connection
             with DBConn() as _conn:
@@ -145,8 +166,6 @@ class DBUtils():
                 if sql_stmt.lower().strip().startswith("select"):
                     return pd.read_sql(sql_stmt, _conn)
                         
-                if DEBUG_SQL:  
-                    logging.info(f"[DEBUG] {sql_stmt}")
                 cur = _conn.cursor()
                 cur.executescript(sql_stmt)
                 _conn.commit()
@@ -158,8 +177,6 @@ class DBUtils():
             if sql_stmt.lower().strip().startswith("select"):
                 return pd.read_sql(sql_stmt, _conn)
                     
-            if DEBUG_SQL:  
-                logging.info(f"[DEBUG] {sql_stmt}")
             cur = _conn.cursor()
             cur.executescript(sql_stmt)
             _conn.commit()
@@ -479,9 +496,10 @@ def db_update_by_id(data, update_changed=True):
 #  Misc Helpers
 #############################
 def debug_print(msg, debug=CFG["DEBUG_FLAG"]):
-    if debug and msg:
+    if msg:
         # st.write(f"[DEBUG] {str(msg)}")
-        logging.debug(f"[DEBUG] {str(msg)}")
+        print(f"[DEBUG] {str(msg)}")
+        # logging.debug(f"[DEBUG] {str(msg)}")
 
 def convert_df2csv(df, index=True):
     return df.to_csv(index=index).encode('utf-8')
@@ -530,7 +548,7 @@ def get_uid():
     return os.getlogin()
 
 def get_ts_now():
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    return datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
 
 def get_uuid():
     return str(uuid4())
@@ -837,7 +855,7 @@ def ui_layout_form(selected_row, table_name):
 
     data = {
         "table_name": table_name,
-        "updated_by": selected_row.get("updated_by", DEFAULT_USER) if selected_row else DEFAULT_USER,
+        "updated_by": selected_row.get("updated_by", CURRENT_USER) if selected_row else CURRENT_USER,
     }
 
     # copy id if present
@@ -933,6 +951,12 @@ def ui_layout_form(selected_row, table_name):
         save_btn = st.form_submit_button(STR_SAVE, help="Double-click to save and refresh")  
         if save_btn:
             try:
+                # Collect form values from session state
+                for key_name in key_names:
+                    col_name = key_name.replace(f"col_{form_name}_", "")
+                    if col_name in st.session_state:
+                        data[col_name] = st.session_state[col_name]
+                
                 delete_flag = data.get("delelte_record", False)
                 data_changed = False
                 
@@ -950,8 +974,8 @@ def ui_layout_form(selected_row, table_name):
                         data.update({
                                     "updated_at": get_ts_now(),
                                     "created_at": get_ts_now(),
-                                    "updated_by": DEFAULT_USER,
-                                    "created_by": DEFAULT_USER,
+                                    "updated_by": CURRENT_USER,
+                                    "created_by": CURRENT_USER,
                                     })
                         db_upsert(data)
                         data_changed = True
@@ -970,11 +994,26 @@ def ui_layout_form(selected_row, table_name):
             except Exception as ex:
                 st.error(f"{str(ex)}")
 
-        # clear form
+        # clear form after save (existing logic)
         try:
-            for c in key_names:
-                st.session_state[c] = ""
+            if save_btn:  # Only clear after save
+                for c in key_names:
+                    st.session_state[c] = ""
         except Exception as e:
+            pass # ignore
+
+    # Clear Form button outside the form
+    if st.button("🧹 Clear Form", help="Clear all form fields"):
+        try:
+            # Clear all form-related session state keys for this table
+            form_prefix = f"col_{form_name}_"
+            keys_to_clear = [key for key in st.session_state.keys() if key.startswith(form_prefix)]
+            for key in keys_to_clear:
+                del st.session_state[key]
+            st.success("Form cleared!")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Error clearing form: {e}")
             pass # ignore
 
 

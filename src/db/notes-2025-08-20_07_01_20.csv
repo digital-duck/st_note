@@ -1,0 +1,45 @@
+note_name,note,url,url2,url3,note_type,tags,updated_at,created_by,is_active,id
+test,test,,,,,,2025-08-20_07:01:13,gongai@ducklover1,1,13
+"Dyad is a free, local, open-source alternative to Lovable, V0, Bolt, and Replit for building full-stack apps.",https://www.reddit.com/r/dyadbuilders/comments/1msvhn1/dyad_app_in_a_docker_container/,,,,task,,2025-08-19 23:45:20,admin,1,2
+Embedding Space,"🌌 The Universal Embedding Space:
+
+  All Modalities → Same Conceptual Space:
+  - Text: ""universe"" → vector [0.2, -0.8, 0.5, ...]
+  - Image: 🌌 photo → vector [0.19, -0.82, 0.48, ...]
+  - Audio: ""universe"" spoken → vector [0.21, -0.79, 0.52, ...]
+  - Chinese: ""宇宙"" → vector [0.18, -0.81, 0.49, ...]
+
+  They all cluster around the same region in embedding space!
+
+  🔬 It's Like Fundamental Physics:
+
+  Just as energy can be:
+  - Kinetic, potential, thermal, electromagnetic
+  - But all convertible through E=mc², conservation laws
+
+  Meaning can be:
+  - Text, image, sound, gesture
+  - But all convertible through embedding transformations
+
+  🚀 Future Implications:
+
+  Your Smart Notes could theoretically:
+  - Search with voice: Speak ""black holes"" → Find text about ""黑洞""
+  - Search with images: Upload 🌟 photo → Find notes about ""stars""
+  - True multimodal RAG: ""Show me notes related to this diagram""
+
+  The embedding space is like a unified field theory for meaning - different modalities are just different manifestations of the same underlying
+  conceptual reality.",https://www.wikiwand.com/en/articles/Embedding,,,learning,LLM,2025-08-19 23:45:20,admin,1,3
+愛因斯坦理論的突破：時間或許只是幻象,探秘宇宙最震撼的真相！著名物理學家加來道雄（Michio Kaku）震撼揭露：時間或許根本不存在！你所理解的時間流逝可能只是大腦的幻覺！本影片帶你深入蟲洞、時間旅行與量子宇宙的奧秘，結合詹姆斯·韋伯太空望遠鏡（James Webb Space Telescope）拍攝的宇宙時空影像，探索時間是否真實存在。從愛因斯坦的相對論到量子悖論的終極追問，我們將解開：如果時間是假的，人類究竟活在哪裡？快來揭開宇宙與神秘學的終極謎團！,https://www.youtube.com/watch?v=qfuF9AplrB0,,,learning,,2025-08-19 23:45:20,admin,1,4
+川普软了！主动放弃对华购俄油征税！本就畏惧中国，美俄会晤给台阶，顺势宣布放弃,,https://www.youtube.com/watch?v=_QyV2S19bfY,,,research,geopolitics,2025-08-19 23:45:20,admin,1,5
+Learn LangGraph Agent framework,complete SQL Agent tutorial,https://github.com/digital-duck/zinetsapp,,,learning,agent,2025-08-19 23:45:20,admin,1,6
+FlowX by Seth D Ford,FlowX: Advanced AI Agent Orchestration Platform (not working),https://github.com/sethdford/flowx,,,learning,agent,2025-08-19 23:45:20,admin,1,7
+Prefect,Dynamic workflow framework in python,https://github.com/digital-duck/ai_slide_deck/blob/main/prefect/index_prefect.html,,,learning,prefect,2025-08-19 23:45:20,admin,1,8
+Claude-Flow,"AI-powered development orchestration. Built from the ground up with enterprise-grade architecture, advanced swarm intelligence, and seamless Claude Code integration.",https://youtu.be/wa86U-dAsdM?si=9KfafXmYjisNz-R7,,,research,claude,2025-08-19 23:45:20,admin,1,9
+Open SWE,Agentic Code by LangGraph Team,https://youtu.be/TaYVvXbOs8c?si=_8odfGJwhUfkCoeQ,,,learning,agent,2025-08-19 23:45:20,admin,1,10
+tensorflow.js,"democratized AI deployment :  │ │ ### **The TensorFlow.js Advantage:**                                                                                                              │ │
+│ │ - **No Installation** - Works on any device with a web browser                                                                                    │ │
+│ │ - **No Internet Required** - Fully functional offline after initial load                                                                          │ │
+│ │ - **No Data Sharing** - Your content never leaves your device                                                                                     │ │
+│ │ - **No Version Conflicts** - Self-contained with embedded dependencies",https://chat.z.ai/c/13ee0c8d-a22b-4a43-be6b-886dff045898,,,learning,"js, tensorflow",2025-08-19 23:45:20,admin,1,11
+encore,Open Source Development Platform for building robust type-safe distributed systems with declarative infrastructure,https://github.com/encoredev/encore,https://encore.dev/,https://encore.dev/,project,AI,2025-08-19 22:40:51,admin,1,1

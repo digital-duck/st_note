@@ -106,7 +106,7 @@ def import_notes_from_csv(import_df, skip_duplicates=True, update_existing=False
                             'table_name': TABLE_NAME,
                             'id': existing_id,
                             'updated_at': get_ts_now(),
-                            'updated_by': DEFAULT_USER
+                            'updated_by': CURRENT_USER
                         }
                         
                         # Add all available columns from CSV
@@ -125,8 +125,8 @@ def import_notes_from_csv(import_df, skip_duplicates=True, update_existing=False
                     'table_name': TABLE_NAME,
                     'created_at': get_ts_now(),
                     'updated_at': get_ts_now(),
-                    'created_by': DEFAULT_USER,
-                    'updated_by': DEFAULT_USER
+                    'created_by': CURRENT_USER,
+                    'updated_by': CURRENT_USER
                 }
                 
                 # Add all available columns from CSV
@@ -191,19 +191,34 @@ def do_note():
     tags = get_tags()
 
     # st.markdown("### 🔍 Search Notes")
-    filter_types, filter_tags, search_col2, mode_col3, stat_col4 = st.columns([1, 1, 2, 1, 1])
+    filter_type, filter_status, filter_tags, mode_col3, search_col2, clear_col, stat_col4 = st.columns([1, 1, 1, 1, 2, 0.5, 1])
 
-    with filter_types:
-        search_types = st.multiselect("Filter by types:", options=CFG["NOTE_TYPE"], default=[])
+    with filter_type:
+        search_type = st.selectbox("Note type:", options=CFG["NOTE_TYPE"], index=0, key="filter_note_type")
+
+    with filter_status:
+        search_status = st.selectbox("Status:", options=CFG["STATUS_CODE"], index=0, key="filter_status")
 
     with filter_tags:
-        search_tags = st.multiselect("Filter by tags:", options=tags, default=[])
+        search_tags = st.multiselect("Tags:", options=tags, default=[], key="filter_tags")
 
     with search_col2:
-        search_query = st.text_input("Search in Name, Description, URL:", placeholder="Enter search terms...")
+        search_query = st.text_input("Search in Name, Description, URL:", placeholder="Enter search terms...", key="search_query")
+    
+    with clear_col:
+        st.write("")  # Add some vertical space
+        if st.button("🧹 Clear", help="Clear all search filters"):
+            # Clear specific search widget keys
+            search_keys = ["filter_note_type", "filter_status", "filter_tags", "search_query", "search_mode"]
+            for key in search_keys:
+                if key in st.session_state:
+                    del st.session_state[key]
+            # Debug: show what keys exist
+            # st.write("Session keys:", [k for k in st.session_state.keys() if 'search' in k.lower() or 'filter' in k.lower()])
+            st.rerun()
     
     with mode_col3:
-        search_mode = st.selectbox("Search mode:", options=["Hybrid", "Keyword", "Semantic"], index=0)
+        search_mode = st.selectbox("Search mode:", options=["Hybrid", "Keyword", "Semantic"], index=0, key="search_mode")
 
     df = None
     semantic_results = []
@@ -249,12 +264,18 @@ def do_note():
         if search_conditions:
             where_conditions.append(f"({' OR '.join(search_conditions)})")
         
-        if search_types:
+        if search_type:
             typ_conditions = []
-            for typ in search_types:
+            for typ in search_type:
                 escaped_typ = escape_single_quote(typ)
                 typ_conditions.append(f" note_type LIKE '%{escaped_typ}%'")
             where_conditions.append(f"({' OR '.join(typ_conditions)})")
+
+        if search_status:
+            stat_conditions = []
+            for stat in search_status:
+                stat_conditions.append(f" note_status LIKE '%{stat}%'")
+            where_conditions.append(f"({' OR '.join(stat_conditions)})")
 
         if search_tags:
             tag_conditions = []
@@ -276,8 +297,10 @@ def do_note():
                 , url2 
                 , url3 
                 , note_type
+                , note_status
                 , tags
                 , updated_at
+                , created_by
                 , is_active
                 , id
             from {TABLE_NAME}
@@ -294,7 +317,7 @@ def do_note():
             df = df.sort_values('similarity_score', ascending=False).drop('similarity_score', axis=1)
 
     with stat_col4:
-        if (search_query or search_tags or search_types) and df is not None and not df.empty:
+        if (search_query or search_tags or search_type or search_status) and df is not None and not df.empty:
             mode_emoji = "🔀" if search_mode == "Hybrid" else "🧠" if search_mode == "Semantic" else "📝"
             st.success(f"{mode_emoji} {len(df)} match(s)")
 

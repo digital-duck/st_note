@@ -43,7 +43,7 @@ A modern, intelligent note-taking application built with Streamlit, featuring se
 ## 📸 Screenshots
 
 ### Main Interface - Semantic Search in Action
-![Smart Notes Interface](docs/semantic-search-demo.png)
+![Smart Notes Interface](docs/st_note_2.png)
 *Semantic search finding "workflow orchestration" matches across different notes - showcasing AI-powered contextual understanding*
 
 ### Search Modes

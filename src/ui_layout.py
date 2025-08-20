@@ -80,6 +80,18 @@ COLUMN_PROPS = {
         'label_text': 'URL3',
         'tooltip': 'Store documentation link or additional reference'
     },
+    'note_status': {
+        'is_system_col': False,
+        'is_user_key': False,
+        'is_required': False,
+        'is_visible': True,
+        'is_editable': True,
+        'is_clickable': False,
+        'datatype': 'text',
+        'form_column': 'COL_2-4',
+        'widget_type': 'selectbox',
+        'label_text': 'Status'
+    },
     # Col_3
     'tags': {
         'is_system_col': False,
@@ -102,19 +114,31 @@ COLUMN_PROPS = {
         'is_editable': False,
         'is_clickable': False,
         'datatype': 'text',
-        'form_column': 'COL_3-2',
+        'form_column': 'COL_3-4',
         'widget_type': 'text_input',
         'label_text': 'Timestamp'
+    },
+    'created_by': {
+        'is_system_col': False,
+        'is_user_key': False,
+        'is_required': True,
+        'is_visible': True,
+        'is_editable': False,
+        'is_clickable': False,
+        'datatype': 'text',
+        'form_column': 'COL_3-3',
+        'widget_type': 'text_input',
+        'label_text': 'UserID'
     },
     'is_active': {
         'is_system_col': False,
         'is_user_key': False,
         'is_required': False,
-        'is_visible': True,
+        'is_visible': False,
         'is_editable': True,
         'is_clickable': False,
         'datatype': 'text',
-        'form_column': 'COL_3-3',
+        'form_column': 'COL_3-4',
         'widget_type': 'selectbox',
         'label_text': 'Active?'
     },
@@ -122,27 +146,15 @@ COLUMN_PROPS = {
         'is_system_col': True,
         'is_user_key': False,
         'is_required': True,
-        'is_visible': False,
+        'is_visible': True,
         'is_editable': False,
         'is_clickable': False,
         'datatype': 'text',
-        'form_column': 'COL_3-4',
+        'form_column': 'COL_3-5',
         'widget_type': 'text_input',
         'label_text': 'ID'
     },
     'updated_by': {
-        'is_system_col': False,
-        'is_user_key': False,
-        'is_required': True,
-        'is_visible': False,
-        'is_editable': False,
-        'is_clickable': False,
-        'datatype': 'text',
-        'form_column': 'COL_2-6',
-        'widget_type': 'text_input',
-        'label_text': 'UserID'
-    },
-    'created_by': {
         'is_system_col': False,
         'is_user_key': False,
         'is_required': True,
