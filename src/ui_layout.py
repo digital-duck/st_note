@@ -27,7 +27,7 @@ COLUMN_PROPS = {
         'widget_type': 'text_area',
         'label_text': 'Description'
     },
-    'note_type': {
+    'tags': {
         'is_system_col': False,
         'is_user_key': False,
         'is_required': False,
@@ -36,49 +36,23 @@ COLUMN_PROPS = {
         'is_clickable': False,
         'datatype': 'text',
         'form_column': 'COL_1-3',
-        'widget_type': 'selectbox',
-        'label_text': 'Type'
+        'widget_type': 'text_input',
+        'label_text': 'Tags',
+        'tooltip': 'Enter tags separated by commas or spaces (e.g., "ai, python, streamlit")'
     },
-
     # Col_2
-    'url': {
+    'note_type': {
         'is_system_col': False,
         'is_user_key': False,
         'is_required': False,
         'is_visible': True,
         'is_editable': True,
-        'is_clickable': True,
+        'is_clickable': False,
         'datatype': 'text',
         'form_column': 'COL_2-1',
-        'widget_type': 'text_input',
-        'label_text': 'URL',
-        'tooltip': 'Store YouTube link or primary URL reference'
-    },
-    'url2': {
-        'is_system_col': False,
-        'is_user_key': False,
-        'is_required': False,
-        'is_visible': True,
-        'is_editable': True,
-        'is_clickable': True,
-        'datatype': 'text',
-        'form_column': 'COL_2-2',
-        'widget_type': 'text_input',
-        'label_text': 'URL2',
-        'tooltip': 'Store GitHub link or secondary URL reference'
-    },
-    'url3': {
-        'is_system_col': False,
-        'is_user_key': False,
-        'is_required': False,
-        'is_visible': True,
-        'is_editable': True,
-        'is_clickable': True,
-        'datatype': 'text',
-        'form_column': 'COL_2-3',
-        'widget_type': 'text_input',
-        'label_text': 'URL3',
-        'tooltip': 'Store documentation link or additional reference'
+        'widget_type': 'selectbox',
+        'label_text': 'Type',
+        'tooltip': 'Trinity framework classification: People (person, organization, community), Product (application, startup, project), Process (task, meeting, event, learning, research)'
     },
     'note_status': {
         'is_system_col': False,
@@ -88,12 +62,11 @@ COLUMN_PROPS = {
         'is_editable': True,
         'is_clickable': False,
         'datatype': 'text',
-        'form_column': 'COL_2-4',
+        'form_column': 'COL_2-2',
         'widget_type': 'selectbox',
         'label_text': 'Status'
     },
-    # Col_3
-    'tags': {
+    'local': {
         'is_system_col': False,
         'is_user_key': False,
         'is_required': False,
@@ -101,11 +74,53 @@ COLUMN_PROPS = {
         'is_editable': True,
         'is_clickable': False,
         'datatype': 'text',
+        'form_column': 'COL_2-3',
+        'widget_type': 'text_input',
+        'label_text': 'Local Ref',
+        'tooltip': 'Local reference'
+    },
+
+    # Col_3
+    'url': {
+        'is_system_col': False,
+        'is_user_key': False,
+        'is_required': False,
+        'is_visible': True,
+        'is_editable': True,
+        'is_clickable': True,
+        'datatype': 'text',
         'form_column': 'COL_3-1',
         'widget_type': 'text_input',
-        'label_text': 'Tags',
-        'tooltip': 'Enter tags separated by commas or spaces (e.g., "ai, python, streamlit")'
+        'label_text': 'URL',
+        'tooltip': 'Primary reference (YouTube/Chat URL)'
     },
+    'url2': {
+        'is_system_col': False,
+        'is_user_key': False,
+        'is_required': False,
+        'is_visible': True,
+        'is_editable': True,
+        'is_clickable': True,
+        'datatype': 'text',
+        'form_column': 'COL_3-2',
+        'widget_type': 'text_input',
+        'label_text': 'URL2',
+        'tooltip': 'Secondary reference (GitHub URL)'
+    },
+    'url3': {
+        'is_system_col': False,
+        'is_user_key': False,
+        'is_required': False,
+        'is_visible': True,
+        'is_editable': True,
+        'is_clickable': True,
+        'datatype': 'text',
+        'form_column': 'COL_3-3',
+        'widget_type': 'text_input',
+        'label_text': 'URL3',
+        'tooltip': 'Additional reference (Documentation/Deep Research)'
+    },
+    # Col_4
     'updated_at': {
         'is_system_col': False,
         'is_user_key': False,
@@ -114,7 +129,7 @@ COLUMN_PROPS = {
         'is_editable': False,
         'is_clickable': False,
         'datatype': 'text',
-        'form_column': 'COL_3-4',
+        'form_column': 'COL_4-1',
         'widget_type': 'text_input',
         'label_text': 'Timestamp'
     },
@@ -126,7 +141,7 @@ COLUMN_PROPS = {
         'is_editable': False,
         'is_clickable': False,
         'datatype': 'text',
-        'form_column': 'COL_3-3',
+        'form_column': 'COL_4-2',
         'widget_type': 'text_input',
         'label_text': 'UserID'
     },
@@ -138,7 +153,7 @@ COLUMN_PROPS = {
         'is_editable': True,
         'is_clickable': False,
         'datatype': 'text',
-        'form_column': 'COL_3-4',
+        'form_column': 'COL_4-3',
         'widget_type': 'selectbox',
         'label_text': 'Active?'
     },
@@ -150,7 +165,7 @@ COLUMN_PROPS = {
         'is_editable': False,
         'is_clickable': False,
         'datatype': 'text',
-        'form_column': 'COL_3-5',
+        'form_column': 'COL_4-4',
         'widget_type': 'text_input',
         'label_text': 'ID'
     },

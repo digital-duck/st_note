@@ -96,8 +96,8 @@ CFG = {
     # assign table names
     "TABLE_NOTE" : "t_note",            # User Notes
 
-    "NOTE_TYPE": [BLANK_STR_VALUE, 'application', 'project', 'task', 'meeting', 'log', 'learning', 'research', 'community', 'startup', 'others'],
-    "STATUS_CODE": [BLANK_STR_VALUE, "ToDo","WIP", "Done", "Blocked", "De-Scoped", "Others"],
+    "NOTE_TYPE": [BLANK_STR_VALUE, 'log', 'learning', 'research', 'project', 'task',  'person', 'organization', 'community',  'event', 'meeting', 'application', 'startup', 'others'],
+    "STATUS_CODE": [BLANK_STR_VALUE, "ToDo","WIP", "Done", "Blocked", "Descoped", "Others"],
 
     # semantic search config
     "EMBEDDING_MODELS": {
@@ -107,6 +107,7 @@ CFG = {
     "DEFAULT_EMBEDDING_MODEL": "English (Fast)",
     "FAISS_INDEX_PATH": "./db/notes_faiss_{model}.index",
 
+    "TEXT_AREA_HEIGHT": 100,
 }
 
 
@@ -118,6 +119,9 @@ SELECTBOX_OPTIONS = {
     "is_active": [0,1],
     "note_type": CFG["NOTE_TYPE"],
     "note_status": CFG["STATUS_CODE"],
+    # Contact management options
+    "relationship_type": [BLANK_STR_VALUE, "colleague", "client", "mentor", "vendor", "partner", "prospect", "others"],
+    "contact_status": [BLANK_STR_VALUE, "active", "inactive", "prospect", "archived"],
 }
 
 
@@ -787,7 +791,7 @@ def ui_layout_form_fields(data,form_name,old_row,col,
         old_val = old_row.get(col, "")
         widget_type = widget_types.get(col, "text_input")
         if widget_type == "text_area":
-            kwargs = {"height":125}
+            kwargs = {"height": CFG["TEXT_AREA_HEIGHT"]}
             val = st.text_area(col_labels.get(col), value=old_val, disabled=DISABLED, key=key_name_field, help=tooltip, **kwargs)
         elif widget_type == "date_input":
             old_date_input = old_val.split("T")[0]
@@ -1292,6 +1296,8 @@ def combine_note_text(note_name, note, url, url2, url3):
         parts.append(f"URL: {url2.strip()}")
     if url3 and url3.strip():
         parts.append(f"URL: {url3.strip()}")
+    if local and local.strip():
+        parts.append(f"URL: {local.strip()}")
     return " | ".join(parts)
 
 def build_faiss_index(model_name=None):
@@ -1300,7 +1306,7 @@ def build_faiss_index(model_name=None):
     
     with DBConn() as _conn:
         sql_stmt = f"""
-            SELECT id, note_name, note, url, url2, url3
+            SELECT id, note_name, note, url, url2, url3, local
             FROM {CFG['TABLE_NOTE']} 
             WHERE is_active = 1
             ORDER BY id
@@ -1315,7 +1321,8 @@ def build_faiss_index(model_name=None):
     
     for _, row in df.iterrows():
         combined_text = combine_note_text(
-            row['note_name'], row['note'], row['url'], row['url2'], row['url3']
+            row['note_name'], row['note'], 
+            row['url'], row['url2'], row['url3'], row['local']
         )
         texts.append(combined_text)
         note_ids.append(row['id'])
@@ -1399,4 +1406,699 @@ def refresh_faiss_index(show_messages=True, model_name=None):
             st.error(f"Error updating search index: {e}")
         logging.error(f"Error refreshing FAISS index: {e}")
         raise e
+
+
+#############################
+# Streamlit Tools Enhanced Functions
+# (Added for meta-application support without modifying existing functions)
+#############################
+
+def db_table_exists(table_name):
+    """Check if a table exists in the database"""
+    try:
+        with DBConn() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT name FROM sqlite_master 
+                WHERE type='table' AND name=?
+            """, (table_name,))
+            return cursor.fetchone() is not None
+    except Exception as e:
+        logging.error(f"Error checking table existence: {e}")
+        return False
+
+def db_create_table_from_ddl(ddl_statement):
+    """Execute DDL statement to create a table"""
+    try:
+        with DBConn() as conn:
+            cursor = conn.cursor()
+            cursor.execute(ddl_statement)
+            conn.commit()
+            return True
+    except Exception as e:
+        logging.error(f"Error creating table: {e}")
+        return False
+
+def db_get_table_columns(table_name):
+    """Get column information for a table"""
+    try:
+        with DBConn() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"PRAGMA table_info({table_name})")
+            columns = cursor.fetchall()
+            return [{"name": col[1], "type": col[2], "not_null": col[3], "default": col[4], "pk": col[5]} 
+                   for col in columns]
+    except Exception as e:
+        logging.error(f"Error getting table columns: {e}")
+        return []
+
+def db_generic_search(table_name, search_query="", filters=None, order_by="updated_at DESC"):
+    """Generic search function for any table following our conventions"""
+    try:
+        with DBConn() as conn:
+            # Build WHERE clause
+            where_conditions = ["is_active = 1"]
+            params = []
+            
+            # Add search query if provided
+            if search_query and search_query.strip():
+                # Get text columns for search
+                columns = db_get_table_columns(table_name)
+                text_columns = [col["name"] for col in columns if col["type"].upper() == "TEXT"]
+                
+                if text_columns:
+                    search_conditions = []
+                    for col in text_columns:
+                        if col not in ['id', 'created_at', 'updated_at', 'created_by', 'updated_by']:
+                            search_conditions.append(f"{col} LIKE ?")
+                            params.append(f"%{search_query.strip()}%")
+                    
+                    if search_conditions:
+                        where_conditions.append(f"({' OR '.join(search_conditions)})")
+            
+            # Add filters if provided
+            if filters:
+                for field, values in filters.items():
+                    if values:  # Only add filter if values are provided
+                        if isinstance(values, list):
+                            placeholders = ','.join(['?' for _ in values])
+                            where_conditions.append(f"{field} IN ({placeholders})")
+                            params.extend(values)
+                        else:
+                            where_conditions.append(f"{field} = ?")
+                            params.append(values)
+            
+            where_clause = " AND ".join(where_conditions)
+            sql = f"SELECT * FROM {table_name} WHERE {where_clause} ORDER BY {order_by}"
+            
+            return pd.read_sql(sql, conn, params=params)
+    
+    except Exception as e:
+        logging.error(f"Error in generic search: {e}")
+        return pd.DataFrame()
+
+def db_generic_upsert(table_name, data, key_fields=None):
+    """Generic upsert function for any table"""
+    try:
+        # Add system fields
+        current_time = datetime.now().isoformat()
+        
+        if 'id' not in data or not data['id']:
+            # New record
+            data.update({
+                'created_at': current_time,
+                'updated_at': current_time,
+                'created_by': CURRENT_USER,
+                'updated_by': CURRENT_USER,
+                'is_active': 1
+            })
+        else:
+            # Update existing record
+            data.update({
+                'updated_at': current_time,
+                'updated_by': CURRENT_USER
+            })
+        
+        return db_upsert(table_name, data)
+    
+    except Exception as e:
+        logging.error(f"Error in generic upsert: {e}")
+        return False
+
+def get_available_tags_for_table(table_name):
+    """Get all unique tags for a table"""
+    try:
+        with DBConn() as conn:
+            sql = f"""
+                SELECT DISTINCT tags FROM {table_name} 
+                WHERE is_active = 1 AND tags IS NOT NULL AND tags != ''
+            """
+            df = pd.read_sql(sql, conn)
+            
+            # Parse and flatten all tags
+            all_tags = set()
+            for tags_str in df['tags'].dropna():
+                if tags_str.strip():
+                    # Split by both comma and space, normalize
+                    import re
+                    tags = re.split(r'[,\s]+', tags_str.strip())
+                    for tag in tags:
+                        tag = tag.strip().upper()
+                        if tag:
+                            all_tags.add(tag)
+            
+            return sorted(list(all_tags))
+    
+    except Exception as e:
+        logging.error(f"Error getting tags for {table_name}: {e}")
+        return []
+
+def build_generic_faiss_index(table_name, text_fields, model_name=None):
+    """Build FAISS index for any table with specified text fields"""
+    try:
+        model_name = model_name or CFG["DEFAULT_EMBEDDING_MODEL"]
+        model = load_embedding_model(model_name)
+        
+        with DBConn() as conn:
+            # Get text columns for the table
+            select_fields = ['id'] + text_fields
+            sql = f"""
+                SELECT {', '.join(select_fields)} FROM {table_name}
+                WHERE is_active = 1
+                ORDER BY id
+            """
+            df = pd.read_sql(sql, conn)
+        
+        if df.empty:
+            logging.info(f"No active records found in {table_name}")
+            return None, []
+        
+        # Combine text fields
+        texts = []
+        record_ids = []
+        
+        for _, row in df.iterrows():
+            combined_text_parts = []
+            for field in text_fields:
+                value = str(row.get(field, '') or '')
+                if value.strip():
+                    combined_text_parts.append(value.strip())
+            
+            combined_text = ' '.join(combined_text_parts)
+            if combined_text.strip():
+                texts.append(combined_text)
+                record_ids.append(row['id'])
+        
+        if not texts:
+            logging.info(f"No text content found in {table_name}")
+            return None, []
+        
+        # Generate embeddings
+        embeddings = model.encode(texts, convert_to_tensor=False, show_progress_bar=False)
+        
+        # Build FAISS index
+        dimension = embeddings.shape[1]
+        index = faiss.IndexFlatIP(dimension)
+        faiss.normalize_L2(embeddings)
+        index.add(embeddings.astype('float32'))
+        
+        # Save index
+        index_path = CFG["FAISS_INDEX_PATH"].format(model=f"{table_name}_{model_name.replace('/', '_')}")
+        os.makedirs(os.path.dirname(index_path), exist_ok=True)
+        faiss.write_index(index, index_path)
+        
+        logging.info(f"Built FAISS index for {table_name}: {len(texts)} records")
+        return index, record_ids
+    
+    except Exception as e:
+        logging.error(f"Error building FAISS index for {table_name}: {e}")
+        return None, []
+
+def generic_semantic_search(table_name, query, text_fields, top_k=10, score_threshold=0.1, model_name=None):
+    """Perform semantic search on any table"""
+    if not query or not query.strip():
+        return []
+    
+    try:
+        model_name = model_name or CFG["DEFAULT_EMBEDDING_MODEL"]
+        model = load_embedding_model(model_name)
+        
+        # Load or build index
+        index_path = CFG["FAISS_INDEX_PATH"].format(model=f"{table_name}_{model_name.replace('/', '_')}")
+        
+        if os.path.exists(index_path):
+            index = faiss.read_index(index_path)
+            
+            # Get record IDs (rebuild from database)
+            with DBConn() as conn:
+                sql = f"SELECT id FROM {table_name} WHERE is_active = 1 ORDER BY id"
+                df = pd.read_sql(sql, conn)
+                record_ids = df['id'].tolist()
+        else:
+            # Build index if it doesn't exist
+            index, record_ids = build_generic_faiss_index(table_name, text_fields, model_name)
+            if index is None:
+                return []
+        
+        # Perform search
+        query_embedding = model.encode([query.strip()], convert_to_tensor=False)
+        faiss.normalize_L2(query_embedding)
+        
+        scores, indices = index.search(query_embedding.astype('float32'), min(top_k, len(record_ids)))
+        
+        results = []
+        for score, idx in zip(scores[0], indices[0]):
+            if idx < len(record_ids) and score > score_threshold:
+                results.append({
+                    'record_id': record_ids[idx],
+                    'similarity_score': float(score)
+                })
+        
+        return results
+    
+    except Exception as e:
+        logging.error(f"Error in semantic search for {table_name}: {e}")
+        return []
+
+def perform_hybrid_search(table_name, query, text_fields, filters=None, search_mode="hybrid", top_k=10):
+    """
+    Perform hybrid search combining keyword and semantic search for any table
+    
+    Args:
+        table_name: Name of the table to search
+        query: Search query string
+        text_fields: List of text fields to search in
+        filters: Dictionary of field filters
+        search_mode: "keyword", "semantic", or "hybrid"
+        top_k: Maximum number of results
+    
+    Returns:
+        pandas.DataFrame with search results
+    """
+    try:
+        if search_mode == "keyword":
+            # Keyword search only
+            return db_generic_search(table_name, query, filters)
+        
+        elif search_mode == "semantic":
+            # Semantic search only
+            semantic_results = generic_semantic_search(table_name, query, text_fields, top_k)
+            if semantic_results:
+                record_ids = [r['record_id'] for r in semantic_results]
+                with DBConn() as conn:
+                    placeholders = ','.join(['?' for _ in record_ids])
+                    sql = f"SELECT * FROM {table_name} WHERE id IN ({placeholders}) AND is_active = 1"
+                    df = pd.read_sql(sql, conn, params=record_ids)
+                
+                # Add similarity scores
+                score_map = {r['record_id']: r['similarity_score'] for r in semantic_results}
+                df['similarity_score'] = df['id'].map(score_map)
+                return df.sort_values('similarity_score', ascending=False)
+            else:
+                return pd.DataFrame()
+        
+        else:  # hybrid
+            # Combine keyword and semantic search
+            keyword_results = db_generic_search(table_name, query, filters)
+            semantic_results = generic_semantic_search(table_name, query, text_fields, top_k)
+            
+            if semantic_results:
+                semantic_ids = [r['record_id'] for r in semantic_results]
+                with DBConn() as conn:
+                    placeholders = ','.join(['?' for _ in semantic_ids])
+                    sql = f"SELECT * FROM {table_name} WHERE id IN ({placeholders}) AND is_active = 1"
+                    semantic_df = pd.read_sql(sql, conn, params=semantic_ids)
+                
+                # Combine results (union)
+                all_results = pd.concat([keyword_results, semantic_df]).drop_duplicates(subset=['id'])
+                return all_results.sort_values('updated_at', ascending=False).head(top_k)
+            else:
+                return keyword_results.head(top_k)
+    
+    except Exception as e:
+        logging.error(f"Error in hybrid search for {table_name}: {e}")
+        return pd.DataFrame()
+
+
+#############################
+# Database-Driven UI Configuration Functions
+# (Inspired by Siebel Tools - Store UI metadata in database)
+#############################
+
+def create_ui_layout_table():
+    """Create the t_ui_layout_config table if it doesn't exist"""
+    try:
+        with DBConn() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS t_ui_layout_config (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    table_name TEXT NOT NULL,
+                    column_name TEXT NOT NULL,
+                    
+                    -- UI Properties
+                    is_system_col INTEGER DEFAULT 0,
+                    is_user_key INTEGER DEFAULT 0,
+                    is_required INTEGER DEFAULT 0,
+                    is_visible INTEGER DEFAULT 1,
+                    is_editable INTEGER DEFAULT 1,
+                    is_clickable INTEGER DEFAULT 0,
+                    
+                    -- Form Layout
+                    form_column TEXT,
+                    widget_type TEXT,
+                    label_text TEXT,
+                    tooltip TEXT,
+                    
+                    -- Configuration Metadata
+                    config_version TEXT DEFAULT '1.0',
+                    datatype TEXT DEFAULT 'text',
+                    
+                    -- System fields
+                    is_active INTEGER DEFAULT 1 CHECK(is_active IN (0, 1)),
+                    created_at TEXT,
+                    updated_at TEXT,
+                    created_by TEXT NOT NULL,
+                    updated_by TEXT,
+                    
+                    UNIQUE(table_name, column_name, config_version)
+                )
+            """)
+            conn.commit()
+            logging.info("UI layout configuration table created successfully")
+            return True
+    except Exception as e:
+        logging.error(f"Error creating UI layout table: {e}")
+        return False
+
+def migrate_column_props_to_db(table_name, column_props_dict, config_version="1.0"):
+    """
+    Migrate existing COLUMN_PROPS dictionary to database
+    
+    Args:
+        table_name: Name of the table
+        column_props_dict: Dictionary of column properties (from ui_layout.py)
+        config_version: Version identifier for this configuration
+    """
+    try:
+        # Ensure table exists
+        create_ui_layout_table()
+        
+        with DBConn() as conn:
+            cursor = conn.cursor()
+            current_time = datetime.now().isoformat()
+            
+            for column_name, props in column_props_dict.items():
+                # Prepare data for insertion
+                ui_config = {
+                    'table_name': table_name,
+                    'column_name': column_name,
+                    'is_system_col': int(props.get('is_system_col', False)),
+                    'is_user_key': int(props.get('is_user_key', False)),
+                    'is_required': int(props.get('is_required', False)),
+                    'is_visible': int(props.get('is_visible', True)),
+                    'is_editable': int(props.get('is_editable', True)),
+                    'is_clickable': int(props.get('is_clickable', False)),
+                    'form_column': props.get('form_column', ''),
+                    'widget_type': props.get('widget_type', 'text_input'),
+                    'label_text': props.get('label_text', column_name.title()),
+                    'tooltip': props.get('tooltip', ''),
+                    'config_version': config_version,
+                    'datatype': props.get('datatype', 'text'),
+                    'created_at': current_time,
+                    'updated_at': current_time,
+                    'created_by': CURRENT_USER,
+                    'updated_by': CURRENT_USER,
+                    'is_active': 1
+                }
+                
+                # Insert or replace configuration
+                cursor.execute("""
+                    INSERT OR REPLACE INTO t_ui_layout_config 
+                    (table_name, column_name, is_system_col, is_user_key, is_required,
+                     is_visible, is_editable, is_clickable, form_column, widget_type,
+                     label_text, tooltip, config_version, datatype, created_at, 
+                     updated_at, created_by, updated_by, is_active)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    ui_config['table_name'], ui_config['column_name'],
+                    ui_config['is_system_col'], ui_config['is_user_key'], ui_config['is_required'],
+                    ui_config['is_visible'], ui_config['is_editable'], ui_config['is_clickable'],
+                    ui_config['form_column'], ui_config['widget_type'], ui_config['label_text'],
+                    ui_config['tooltip'], ui_config['config_version'], ui_config['datatype'],
+                    ui_config['created_at'], ui_config['updated_at'], ui_config['created_by'],
+                    ui_config['updated_by'], ui_config['is_active']
+                ))
+            
+            conn.commit()
+            logging.info(f"Migrated {len(column_props_dict)} column configurations for {table_name}")
+            return True
+            
+    except Exception as e:
+        logging.error(f"Error migrating column props to database: {e}")
+        return False
+
+def load_ui_config_from_db(table_name, config_version="1.0"):
+    """
+    Load UI configuration from database and return in COLUMN_PROPS format
+    
+    Args:
+        table_name: Name of the table
+        config_version: Version of configuration to load
+        
+    Returns:
+        Dictionary in COLUMN_PROPS format
+    """
+    try:
+        with DBConn() as conn:
+            sql = """
+                SELECT column_name, is_system_col, is_user_key, is_required,
+                       is_visible, is_editable, is_clickable, form_column,
+                       widget_type, label_text, tooltip, datatype
+                FROM t_ui_layout_config 
+                WHERE table_name = ? AND config_version = ? AND is_active = 1
+                ORDER BY form_column, column_name
+            """
+            df = pd.read_sql(sql, conn, params=(table_name, config_version))
+            
+            if df.empty:
+                logging.warning(f"No UI configuration found for {table_name} version {config_version}")
+                return {}
+            
+            # Convert to COLUMN_PROPS format
+            column_props = {}
+            for _, row in df.iterrows():
+                column_name = row['column_name']
+                column_props[column_name] = {
+                    'is_system_col': bool(row['is_system_col']),
+                    'is_user_key': bool(row['is_user_key']),
+                    'is_required': bool(row['is_required']),
+                    'is_visible': bool(row['is_visible']),
+                    'is_editable': bool(row['is_editable']),
+                    'is_clickable': bool(row['is_clickable']),
+                    'datatype': row['datatype'] or 'text',
+                    'form_column': row['form_column'] or '',
+                    'widget_type': row['widget_type'] or 'text_input',
+                    'label_text': row['label_text'] or column_name.title(),
+                    'tooltip': row['tooltip'] or ''
+                }
+            
+            return column_props
+            
+    except Exception as e:
+        logging.error(f"Error loading UI config from database: {e}")
+        return {}
+
+def save_ui_config_to_db(table_name, column_name, ui_properties, config_version="1.0"):
+    """
+    Save individual column UI configuration to database
+    
+    Args:
+        table_name: Name of the table
+        column_name: Name of the column
+        ui_properties: Dictionary of UI properties
+        config_version: Configuration version
+    """
+    try:
+        # Ensure table exists
+        create_ui_layout_table()
+        
+        with DBConn() as conn:
+            current_time = datetime.now().isoformat()
+            
+            # Prepare data
+            ui_config = {
+                'table_name': table_name,
+                'column_name': column_name,
+                'is_system_col': int(ui_properties.get('is_system_col', False)),
+                'is_user_key': int(ui_properties.get('is_user_key', False)),
+                'is_required': int(ui_properties.get('is_required', False)),
+                'is_visible': int(ui_properties.get('is_visible', True)),
+                'is_editable': int(ui_properties.get('is_editable', True)),
+                'is_clickable': int(ui_properties.get('is_clickable', False)),
+                'form_column': ui_properties.get('form_column', ''),
+                'widget_type': ui_properties.get('widget_type', 'text_input'),
+                'label_text': ui_properties.get('label_text', column_name.title()),
+                'tooltip': ui_properties.get('tooltip', ''),
+                'config_version': config_version,
+                'datatype': ui_properties.get('datatype', 'text'),
+                'updated_at': current_time,
+                'updated_by': CURRENT_USER
+            }
+            
+            cursor = conn.cursor()
+            
+            # Check if configuration exists
+            cursor.execute("""
+                SELECT id FROM t_ui_layout_config 
+                WHERE table_name = ? AND column_name = ? AND config_version = ?
+            """, (table_name, column_name, config_version))
+            
+            existing = cursor.fetchone()
+            
+            if existing:
+                # Update existing
+                cursor.execute("""
+                    UPDATE t_ui_layout_config SET
+                        is_system_col = ?, is_user_key = ?, is_required = ?,
+                        is_visible = ?, is_editable = ?, is_clickable = ?,
+                        form_column = ?, widget_type = ?, label_text = ?,
+                        tooltip = ?, datatype = ?, updated_at = ?, updated_by = ?
+                    WHERE table_name = ? AND column_name = ? AND config_version = ?
+                """, (
+                    ui_config['is_system_col'], ui_config['is_user_key'], ui_config['is_required'],
+                    ui_config['is_visible'], ui_config['is_editable'], ui_config['is_clickable'],
+                    ui_config['form_column'], ui_config['widget_type'], ui_config['label_text'],
+                    ui_config['tooltip'], ui_config['datatype'], ui_config['updated_at'], 
+                    ui_config['updated_by'], table_name, column_name, config_version
+                ))
+            else:
+                # Insert new
+                ui_config['created_at'] = current_time
+                ui_config['created_by'] = CURRENT_USER
+                ui_config['is_active'] = 1
+                
+                cursor.execute("""
+                    INSERT INTO t_ui_layout_config 
+                    (table_name, column_name, is_system_col, is_user_key, is_required,
+                     is_visible, is_editable, is_clickable, form_column, widget_type,
+                     label_text, tooltip, config_version, datatype, created_at, 
+                     updated_at, created_by, updated_by, is_active)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    ui_config['table_name'], ui_config['column_name'],
+                    ui_config['is_system_col'], ui_config['is_user_key'], ui_config['is_required'],
+                    ui_config['is_visible'], ui_config['is_editable'], ui_config['is_clickable'],
+                    ui_config['form_column'], ui_config['widget_type'], ui_config['label_text'],
+                    ui_config['tooltip'], ui_config['config_version'], ui_config['datatype'],
+                    ui_config['created_at'], ui_config['updated_at'], ui_config['created_by'],
+                    ui_config['updated_by'], ui_config['is_active']
+                ))
+            
+            conn.commit()
+            return True
+            
+    except Exception as e:
+        logging.error(f"Error saving UI config to database: {e}")
+        return False
+
+def compile_ui_layout_from_db(output_file=None):
+    """
+    Generate ui_layout.py file from database configurations
+    
+    Args:
+        output_file: Path to output file (default: ui_layout.py)
+    """
+    try:
+        if output_file is None:
+            output_file = os.path.join(os.path.dirname(__file__), 'ui_layout_generated.py')
+        
+        with DBConn() as conn:
+            sql = """
+                SELECT DISTINCT table_name FROM t_ui_layout_config 
+                WHERE is_active = 1 
+                ORDER BY table_name
+            """
+            tables_df = pd.read_sql(sql, conn)
+            
+            if tables_df.empty:
+                logging.warning("No UI configurations found in database")
+                return False
+            
+            # Generate Python code
+            generated_code = [
+                "# Generated UI Layout Configuration",
+                "# Auto-generated from t_ui_layout_config table",
+                f"# Generated at: {datetime.now().isoformat()}",
+                "",
+                "# Import statements",
+                "from utils import BLANK_STR_VALUE",
+                "",
+                "COLUMN_PROPS = {"
+            ]
+            
+            for _, table_row in tables_df.iterrows():
+                table_name = table_row['table_name']
+                column_props = load_ui_config_from_db(table_name)
+                
+                if column_props:
+                    generated_code.append(f"    '{table_name}': {{")
+                    
+                    for column_name, props in column_props.items():
+                        generated_code.append(f"        '{column_name}': {{")
+                        for key, value in props.items():
+                            if isinstance(value, str):
+                                generated_code.append(f"            '{key}': '{value}',")
+                            else:
+                                generated_code.append(f"            '{key}': {value},")
+                        generated_code.append("        },")
+                    
+                    generated_code.append("    },")
+            
+            generated_code.append("}")
+            generated_code.append("")
+            
+            # Write to file
+            with open(output_file, 'w') as f:
+                f.write('\n'.join(generated_code))
+            
+            logging.info(f"Generated UI layout file: {output_file}")
+            return True
+            
+    except Exception as e:
+        logging.error(f"Error compiling UI layout from database: {e}")
+        return False
+
+def get_ui_config_versions(table_name):
+    """Get all configuration versions for a table"""
+    try:
+        with DBConn() as conn:
+            sql = """
+                SELECT DISTINCT config_version, created_at, created_by
+                FROM t_ui_layout_config 
+                WHERE table_name = ? AND is_active = 1
+                ORDER BY created_at DESC
+            """
+            df = pd.read_sql(sql, conn, params=(table_name,))
+            return df.to_dict('records')
+    except Exception as e:
+        logging.error(f"Error getting UI config versions: {e}")
+        return []
+
+def dynamic_load_column_props(table_name, fallback_to_static=True):
+    """
+    Dynamically load COLUMN_PROPS for a table, with fallback to static configuration
+    
+    Args:
+        table_name: Name of the table
+        fallback_to_static: Whether to fallback to ui_layout.py if DB config not found
+        
+    Returns:
+        Dictionary of column properties
+    """
+    try:
+        # Try loading from database first
+        db_config = load_ui_config_from_db(table_name)
+        
+        if db_config:
+            logging.info(f"Loaded UI config from database for {table_name}")
+            return db_config
+        
+        # Fallback to static configuration
+        if fallback_to_static:
+            try:
+                from ui_layout import COLUMN_PROPS
+                static_config = COLUMN_PROPS.get(table_name, {})
+                if static_config:
+                    logging.info(f"Using static UI config for {table_name}")
+                    return static_config
+            except ImportError:
+                logging.warning("Could not import static ui_layout.py")
+        
+        logging.warning(f"No UI configuration found for {table_name}")
+        return {}
+        
+    except Exception as e:
+        logging.error(f"Error in dynamic column props loading: {e}")
+        return {}
 

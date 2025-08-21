@@ -1,0 +1,107 @@
+{
+  "table_name": "t_note",
+  "display_name": "📝 Notes",
+  "description": "AI-powered note-taking with semantic search and Trinity framework classification",
+  "icon": "📝",
+  "menu_position": 1,
+  "columns": [
+    {
+      "name": "id",
+      "type": "INTEGER",
+      "constraints": ["PRIMARY KEY", "AUTOINCREMENT"],
+      "description": "Unique identifier"
+    },
+    {
+      "name": "note_name",
+      "type": "TEXT",
+      "constraints": ["NOT NULL"],
+      "description": "Note title/name"
+    },
+    {
+      "name": "note",
+      "type": "TEXT",
+      "constraints": [],
+      "description": "Note content/description"
+    },
+    {
+      "name": "url",
+      "type": "TEXT",
+      "constraints": [],
+      "description": "Primary reference URL"
+    },
+    {
+      "name": "url2",
+      "type": "TEXT",
+      "constraints": [],
+      "description": "Secondary reference URL"
+    },
+    {
+      "name": "url3",
+      "type": "TEXT",
+      "constraints": [],
+      "description": "Additional reference URL"
+    },
+    {
+      "name": "local",
+      "type": "TEXT",
+      "constraints": [],
+      "description": "Local file path or reference"
+    },
+    {
+      "name": "note_type",
+      "type": "TEXT",
+      "constraints": ["DEFAULT ''"],
+      "description": "Trinity framework classification"
+    },
+    {
+      "name": "note_status",
+      "type": "TEXT",
+      "constraints": ["DEFAULT ''"],
+      "description": "Workflow status"
+    },
+    {
+      "name": "tags",
+      "type": "TEXT",
+      "constraints": [],
+      "description": "Comma-separated tags"
+    },
+    {
+      "name": "is_active",
+      "type": "INTEGER",
+      "constraints": ["DEFAULT 1", "CHECK(is_active IN (0, 1))"],
+      "description": "Active/inactive flag"
+    },
+    {
+      "name": "created_at",
+      "type": "TEXT",
+      "constraints": [],
+      "description": "Creation timestamp"
+    },
+    {
+      "name": "updated_at",
+      "type": "TEXT",
+      "constraints": [],
+      "description": "Last update timestamp"
+    },
+    {
+      "name": "created_by",
+      "type": "TEXT",
+      "constraints": ["NOT NULL"],
+      "description": "Creator user ID"
+    },
+    {
+      "name": "updated_by",
+      "type": "TEXT",
+      "constraints": [],
+      "description": "Last updater user ID"
+    }
+  ],
+  "features": {
+    "semantic_search": true,
+    "import_export": true,
+    "tag_management": true,
+    "url_linking": true,
+    "audit_trail": true
+  },
+  "trinity_domains": ["People", "Product", "Process"]
+}

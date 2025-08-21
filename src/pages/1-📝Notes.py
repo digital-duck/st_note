@@ -48,7 +48,9 @@ def import_notes_from_csv(import_df, skip_duplicates=True, update_existing=False
         'url': '',
         'url2': '',
         'url3': '',
+        'local': '',
         'note_type': '',
+        'note_status': '',
         'tags': '',
         'is_active': 1
     }
@@ -285,6 +287,7 @@ def do_note():
                 , url 
                 , url2 
                 , url3 
+                , local
                 , note_type
                 , note_status
                 , tags
@@ -341,7 +344,7 @@ def do_note():
             uploaded_file = st.file_uploader(
                 "Import",
                 type=['csv'],
-                help="Upload a CSV file with notes. Required: note_name. Optional: note, url, url2, url3, note_type, tags. Duplicates detected by (note_name + note_type) combination.",
+                help="Upload a CSV file with notes. Required: note_name. Optional: note, url, url2, url3, local, note_type, note_status, tags. Duplicates detected by (note_name + note_type) combination.",
                 key="csv_import"
             )
         

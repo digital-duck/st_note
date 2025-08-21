@@ -10,4 +10,4 @@ click
 jsonlines
 sentence-transformers
 faiss-cpu
-numpy
+numpyjinja2>=3.0.0

@@ -51,7 +51,7 @@ def main():
         print("📝 Fetching notes from database...")
         with DBConn() as _conn:
             sql_stmt = f"""
-                SELECT id, note_name, note, url
+                SELECT id, note_name, note, url, url2, url3, local
                 FROM {CFG['TABLE_NOTE']} 
                 WHERE is_active = 1
                 ORDER BY id
@@ -70,7 +70,8 @@ def main():
         
         for i, row in df.iterrows():
             combined_text = combine_note_text(
-                row['note_name'], row['note'], row['url']
+                row['note_name'], row['note']
+                , row['url'], row['url2'], row['url3'], row['local']
             )
             texts.append(combined_text)
             note_ids.append(row['id'])
