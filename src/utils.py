@@ -102,7 +102,7 @@ CFG = {
     # semantic search config
     "EMBEDDING_MODELS": {
         "English (Fast)": "all-MiniLM-L6-v2",
-        "Multilingual (EN+CN)": "paraphrase-multilingual-MiniLM-L12-v2"
+        "Multilingual": "paraphrase-multilingual-MiniLM-L12-v2"
     },
     "DEFAULT_EMBEDDING_MODEL": "English (Fast)",
     "FAISS_INDEX_PATH": "./db/notes_faiss_{model}.index",
@@ -1283,7 +1283,7 @@ def get_index_path(model_name=None):
     safe_model_name = model_name.lower().replace(" ", "_").replace("(", "").replace(")", "")
     return CFG["FAISS_INDEX_PATH"].format(model=safe_model_name)
 
-def combine_note_text(note_name, note, url, url2, url3):
+def combine_note_text(note_name, note, url, url2, url3, local):
     """Combine note fields into a single text for embedding"""
     parts = []
     if note_name and note_name.strip():
@@ -1321,8 +1321,7 @@ def build_faiss_index(model_name=None):
     
     for _, row in df.iterrows():
         combined_text = combine_note_text(
-            row['note_name'], row['note'], 
-            row['url'], row['url2'], row['url3'], row['local']
+            row['note_name'], row['note'], row['url'], row['url2'], row['url3'], row['local']
         )
         texts.append(combined_text)
         note_ids.append(row['id'])

@@ -36,76 +36,56 @@ def main():
         print("ℹ️  No active notes found in database. Nothing to migrate.")
         return
     
-    # Check if index already exists
-    if os.path.exists(CFG["FAISS_INDEX_PATH"]):
-        response = input(f"⚠️  FAISS index already exists at {CFG['FAISS_INDEX_PATH']}. Rebuild? (y/N): ")
+    # Get all available embedding models
+    available_models = list(CFG["EMBEDDING_MODELS"].keys())
+    print(f"📊 Building indexes for all embedding models: {', '.join(available_models)}")
+    
+    # Check if any indexes already exist
+    existing_indexes = []
+    for model_name in available_models:
+        index_path = get_index_path(model_name)
+        if os.path.exists(index_path):
+            existing_indexes.append((model_name, index_path))
+    
+    if existing_indexes:
+        print(f"⚠️  Found existing indexes:")
+        for model_name, index_path in existing_indexes:
+            print(f"   - {model_name}: {index_path}")
+        response = input("Rebuild all existing indexes? (y/N): ")
         if response.lower() != 'y':
             print("❌ Migration cancelled.")
             return
     
     try:
-        print("📊 Loading embedding model...")
-        model = load_embedding_model()
-        print(f"✅ Model loaded: {CFG['EMBEDDING_MODEL']}")
+        successful_builds = 0
+        total_models = len(available_models)
         
-        print("📝 Fetching notes from database...")
-        with DBConn() as _conn:
-            sql_stmt = f"""
-                SELECT id, note_name, note, url, url2, url3, local
-                FROM {CFG['TABLE_NOTE']} 
-                WHERE is_active = 1
-                ORDER BY id
-            """
-            df = pd.read_sql(sql_stmt, _conn)
-        
-        print(f"📋 Found {len(df)} notes to process")
-        
-        if df.empty:
-            print("ℹ️  No notes to process.")
-            return
-        
-        print("🔄 Building embeddings...")
-        texts = []
-        note_ids = []
-        
-        for i, row in df.iterrows():
-            combined_text = combine_note_text(
-                row['note_name'], row['note']
-                , row['url'], row['url2'], row['url3'], row['local']
-            )
-            texts.append(combined_text)
-            note_ids.append(row['id'])
+        for i, model_name in enumerate(available_models, 1):
+            print(f"\n📊 [{i}/{total_models}] Building FAISS index using model: {model_name}")
             
-            if (i + 1) % 10 == 0:
-                print(f"   Processed {i + 1}/{len(df)} notes...")
+            # Use the existing build_faiss_index function
+            index, note_ids = build_faiss_index(model_name)
+            
+            if index is None:
+                print(f"   ⚠️  No notes to process for {model_name}")
+                continue
+            
+            index_path = get_index_path(model_name)
+            print(f"   ✅ Index built successfully for {model_name}")
+            print(f"      📊 Processed {len(note_ids)} notes")
+            print(f"      📁 Index saved to {index_path}")
+            print(f"      🎯 Index dimension: {index.d}")
+            
+            successful_builds += 1
         
-        print("🧠 Generating embeddings...")
-        embeddings = model.encode(texts, convert_to_tensor=False, show_progress_bar=True)
+        print(f"\n🎉 Migration completed!")
+        print(f"   ✅ Successfully built {successful_builds}/{total_models} indexes")
         
-        print("🔧 Building FAISS index...")
-        dimension = embeddings.shape[1]
-        index = faiss.IndexFlatIP(dimension)  # Inner Product for cosine similarity
-        
-        # Normalize embeddings for cosine similarity
-        faiss.normalize_L2(embeddings)
-        index.add(embeddings.astype('float32'))
-        
-        # Ensure db directory exists
-        os.makedirs(os.path.dirname(CFG["FAISS_INDEX_PATH"]), exist_ok=True)
-        
-        print(f"💾 Saving index to {CFG['FAISS_INDEX_PATH']}...")
-        faiss.write_index(index, CFG["FAISS_INDEX_PATH"])
-        
-        print(f"✅ Migration completed successfully!")
-        print(f"   📊 Processed {len(df)} notes")
-        print(f"   🧠 Generated {len(embeddings)} embeddings")
-        print(f"   📁 Index saved to {CFG['FAISS_INDEX_PATH']}")
-        print(f"   🎯 Index dimension: {dimension}")
-        
-        # Test the index
-        print("🧪 Testing search functionality...")
-        test_results = semantic_search("test query", top_k=3)
-        print(f"   ✅ Search test passed: found {len(test_results)} results")
+        # Test search functionality with default model
+        if successful_builds > 0:
+            print("🧪 Testing search functionality...")
+            test_results = semantic_search("test query", top_k=3)
+            print(f"   ✅ Search test passed: found {len(test_results)} results")
         
     except Exception as e:
         print(f"❌ Migration failed: {e}")

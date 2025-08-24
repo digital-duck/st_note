@@ -188,7 +188,7 @@ def import_notes_from_csv(import_df, skip_duplicates=True, update_existing=False
         progress_bar.empty()
         status_text.empty()
 
-def do_note():
+def do_note(DEBUG: bool = False):
     # get distinct tags
     tags = get_tags()
 
@@ -207,79 +207,61 @@ def do_note():
     with search_col2:
         search_query = st.text_input("Search in Name, Description, URL:", placeholder="Enter search terms...", key="search_query")
     
-   
     with mode_col3:
         search_mode = st.selectbox("Search mode:", options=["Hybrid", "Keyword", "Semantic"], index=0, key="search_mode")
 
     df = None
     semantic_results = []
-    
+    if search_query:
+        search_query = search_query.strip()
+
+
     # Handle semantic search
-    if search_query and search_query.strip() and search_mode in ["Hybrid", "Semantic"]:
+    semantic_condition = " 1 = 1 "  # Default true condition
+    if search_query and search_mode in ["Hybrid", "Semantic"]:
         top_k = st.session_state.get("top_k", 10)
         score_threshold = st.session_state.get("score_threshold", 0.3)
         selected_model = st.session_state.get("embedding_model", CFG["DEFAULT_EMBEDDING_MODEL"])
-        semantic_results = semantic_search(search_query.strip(), top_k=top_k, score_threshold=score_threshold, model_name=selected_model)
-    
-    with DBConn() as _conn:
-        where_conditions = []
-        search_conditions = []  # For combining keyword + semantic
-        
-        # Handle keyword/text search
-        if search_query and search_query.strip() and search_mode in ["Hybrid", "Keyword"]:
-            search_term = escape_single_quote(search_query.strip())
-            keyword_condition = f"""
-                (note_name LIKE '%{search_term}%' 
-                OR note LIKE '%{search_term}%'
-                OR url LIKE '%{search_term}%')
-            """
-            if search_mode == "Keyword":
-                where_conditions.append(keyword_condition)
-            else:  # Hybrid mode
-                search_conditions.append(keyword_condition)
-        
-        # Handle semantic search results
-        if search_mode in ["Hybrid", "Semantic"]:
+        semantic_ids = []
+        for query in search_query.split():
+            semantic_results = semantic_search(query, top_k=top_k, score_threshold=score_threshold, model_name=selected_model)
             if semantic_results:
-                semantic_ids = [str(result['note_id']) for result in semantic_results]
-                semantic_condition = f"id IN ({','.join(semantic_ids)})"
-                if search_mode == "Semantic":
-                    where_conditions.append(semantic_condition)
-                else:  # Hybrid mode
-                    search_conditions.append(semantic_condition)
-            elif search_mode == "Semantic":
-                # For semantic-only mode with no results, return nothing
-                where_conditions.append("id = -1")  # This will match no rows
-        
-        # Combine search conditions with OR for hybrid mode
-        if search_conditions:
-            where_conditions.append(f"({' OR '.join(search_conditions)})")
-        
-        if search_type:
-            typ_conditions = []
-            for typ in search_type:
-                escaped_typ = escape_single_quote(typ)
-                typ_conditions.append(f" note_type LIKE '%{escaped_typ}%'")
-            where_conditions.append(f"({' OR '.join(typ_conditions)})")
+                semantic_ids += [str(result['note_id']) for result in semantic_results]
+            if DEBUG: print("[DEBUG] query:", query, "->", len(semantic_results), "results", semantic_ids)  # Debugging line
+        if semantic_ids:
+            unique_ids = list(set(semantic_ids))
+            semantic_condition = f" id IN ({','.join(unique_ids)}) "
 
-        if search_status:
-            stat_conditions = []
-            for stat in search_status:
-                stat_conditions.append(f" note_status LIKE '%{stat}%'")
-            where_conditions.append(f"({' OR '.join(stat_conditions)})")
+    # filter and search
+    where_conditions = [ f" is_active = 1 and {semantic_condition}" ]
+    if search_type:
+        where_conditions.append(f" note_type LIKE '%{search_type}%'")
 
-        if search_tags:
-            tag_conditions = []
-            for tag in search_tags:
-                escaped_tag = escape_single_quote(tag)
-                # Use word boundaries to match individual tags (case-insensitive)
-                tag_conditions.append(f"UPPER(tags) LIKE '%{escaped_tag.upper()}%'")
-            where_conditions.append(f"({' OR '.join(tag_conditions)})")
-        
-        where_clause = ""
-        if where_conditions:
-            where_clause = f"WHERE {' AND '.join(where_conditions)}"
-        
+    if search_status:
+        where_conditions.append(f" note_status LIKE '%{search_status}%'")
+
+    if search_tags:
+        tag_conditions = []
+        for tag in search_tags:
+            escaped_tag = escape_single_quote(tag)
+            # Use word boundaries to match individual tags (case-insensitive)
+            tag_conditions.append(f"UPPER(tags) LIKE '%{escaped_tag.upper()}%'")
+        where_conditions.append(f"({' OR '.join(tag_conditions)})")
+
+    if search_query and search_mode in ["Keyword"]:
+        search_conditions = []
+        for query in search_query.split():
+            escaped_query = escape_single_quote(query)
+            for col in ["note_name", "note", "url", "url2", "url3", "local"]:
+                search_conditions.append(f" {col} LIKE '%{escaped_query}%'")
+        where_conditions.append(f"({' OR '.join(search_conditions)})")
+
+    where_clause = ""
+    if where_conditions:
+        where_clause = f"WHERE {' AND '.join(where_conditions)}"   
+    if DEBUG: print(f"[DEBUG] where_clause:", where_clause)  # Debugging line
+
+    with DBConn() as _conn:
         sql_stmt = f"""
             select 
                 note_name
@@ -302,11 +284,11 @@ def do_note():
         """
         df = pd.read_sql(sql_stmt, _conn)
         
-        # For semantic-only search, order by similarity score
-        if search_mode == "Semantic" and semantic_results:
-            score_map = {result['note_id']: result['similarity_score'] for result in semantic_results}
-            df['similarity_score'] = df['id'].map(score_map)
-            df = df.sort_values('similarity_score', ascending=False).drop('similarity_score', axis=1)
+        # # For semantic-only search, order by similarity score
+        # if search_mode == "Semantic" and semantic_results:
+        #     score_map = {result['note_id']: result['similarity_score'] for result in semantic_results}
+        #     df['similarity_score'] = df['id'].map(score_map)
+        #     df = df.sort_values('similarity_score', ascending=False).drop('similarity_score', axis=1)
 
     with stat_col4:
         if (search_query or search_tags or search_type or search_status) and df is not None and not df.empty:
@@ -415,7 +397,7 @@ def show_sidebar():
         model_options = list(CFG["EMBEDDING_MODELS"].keys())
         st.selectbox("Embedding Model", options=model_options, 
                     index=model_options.index(CFG["DEFAULT_EMBEDDING_MODEL"]),
-                    help="English (Fast): Optimized for English-only content\nMultilingual (EN+CN): Supports Chinese and English with cross-language search",
+                    help="English (Fast): Optimized for English-only content\nMultilingual: Supports cross-language search",
                     key="embedding_model")
         
         st.slider("Max Results (top_k)", min_value=5, max_value=50, value=10, step=5,
